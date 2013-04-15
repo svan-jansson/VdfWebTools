@@ -1,0 +1,9 @@
+//  cJSONDictionary class:
+//  Created by Erik Svensson and published on eriksven.com in April 2013
+Use cHashTable.pkg
+
+Class cJSONDictionary is a cHashTable
+    Procedure Construct_Object
+        Forward Send Construct_Object
+    End_Procedure
+End_Class

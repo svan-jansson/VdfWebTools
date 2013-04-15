@@ -1,0 +1,188 @@
+//  cJSONParser class:
+//  Created by Erik Svensson and published on eriksven.com in April 2013
+Use cJSONDictionary.pkg
+Use cRegex.pkg
+
+Class cJSONParser is a cObject
+    
+    Procedure Construct_Object
+        Forward Send Construct_Object
+        Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d+|\{|\}|\:|[a-zA-Z0-9_\.]+)'
+        Property String psJSON
+    End_Procedure
+    
+    Procedure _UnQuote String ByRef s
+        If (Left(s,1) = '"' and Right(s,1) = '"') Begin
+            Move (Right(s,Length(s)-1)) to s
+            Move (Left(s, Length(s)-1)) to s
+        End
+        //Unescaping according to JSON.org
+        Move (Replaces('\"',s,'"')) to s
+        Move (Replaces('\\',s,'\')) to s
+        Move (Replaces('\/',s,'/')) to s
+        Move (Replaces('\b',s,Character(8)))  to s
+        Move (Replaces('\f',s,Character(12))) to s
+        Move (Replaces('\n',s,Character(10))) to s
+        Move (Replaces('\r',s,Character(13))) to s
+        Move (Replaces('\t',s,Character(9)))  to s
+    End_Procedure
+    
+    Procedure _Isolate Integer iObjStart tRegexMatch[] ByRef tokenized tRegexMatch[] ByRef Isolated String sStarting String sEnding
+        Integer i iLevel
+        Boolean bClosed
+
+        For i from iObjStart to (SizeOfArray(tokenized)-1)
+            If (tokenized[i].Val = sStarting) Begin
+                Increment iLevel
+            End
+            
+            If (tokenized[i].Val = sEnding) Begin
+                Decrement iLevel
+                Move (iLevel = 0) to bClosed
+            End
+            
+            If bClosed Break
+        Loop
+
+        Move (CopyArray(tokenized, iObjStart+1, i-1)) to isolated
+        
+        Function_Return isolated        
+    End_Procedure
+    
+    Function _IsolateObject Integer iObjStart tRegexMatch[] tokenized Returns tRegexMatch[]
+        tRegexMatch[] isolated
+        Send _Isolate iObjStart (&tokenized) (&isolated) "{" "}"
+        Function_Return isolated         
+    End_Function
+
+    Function _IsolateArray Integer iObjStart tRegexMatch[] tokenized Returns tRegexMatch[]
+        tRegexMatch[] isolated
+        Send _Isolate iObjStart (&tokenized) (&isolated) "[" "]"
+        Function_Return isolated   
+    End_Function
+    
+    Procedure _ParseArray Variant[] ByRef vaParent tRegexMatch[] tokenized Integer iLevel
+        Integer i
+        String sKey sValue
+        Handle h
+        tRegexMatch[] isolated
+        Variant[] va
+        For i from 0 to (SizeOfArray(tokenized)-1)
+            
+            If (tokenized[i].Val <> "," and tokenized[i].Val <> "}" and tokenized[i].Val <> "]") Begin
+            
+                //{object}
+                If (tokenized[i].Val = "{") Begin
+                    Get Create U_cJSONDictionary to h
+                    Move h to vaParent[(SizeOfArray(vaParent))]
+                    Get _IsolateObject i tokenized to isolated
+                    Send _ParseObject h isolated (iLevel+1)
+                    Add (SizeOfArray(isolated)) to i
+                End
+                
+                //[array]
+                Else If (tokenized[i].Val = "[") Begin
+                    Move (_IsolateArray(Self, i, tokenized)) to isolated
+                    Send _ParseArray (&va) isolated (iLevel+1)
+                    Add (SizeOfArray(isolated)) to i
+                    Move va to vaParent[(SizeOfArray(vaParent))]
+                End
+                
+                //value
+                Else Begin
+                    Move tokenized[i].Val to sValue
+                    Send _UnQuote (&sValue)
+                    Move sValue to vaParent[(SizeOfArray(vaParent))]
+                End      
+            
+            End
+            
+        Loop
+    End_Procedure
+    
+    Procedure _ParseObject Handle hParent tRegexMatch[] tokenized Integer ByRef iLevel
+        Integer i ii
+        String sKey sValue sText
+        Handle h
+        Variant[] va
+        tRegexMatch[] isolated
+
+        For i from 0 to (SizeOfArray(tokenized)-1)
+
+            //"key":"value"
+            If (tokenized[i].Val = ":" and tokenized[i+1].Val <> "{" and tokenized[i+1].Val <> "[") Begin
+                Move tokenized[i-1].Val to sKey
+                Move tokenized[i+1].Val to sValue
+                Send _UnQuote (&sKey)
+                Send _UnQuote (&sValue)
+                Set Value of hParent sKey to sValue
+            End
+            
+            //"key":{object}
+            Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "{") Begin
+                Get Create U_cJSONDictionary to h
+                Move tokenized[i-1].Val to sKey
+                Send _UnQuote (&sKey)
+                Set Value of hParent sKey to h
+                Increment iLevel
+                Move (_IsolateObject(Self, i+1, tokenized)) to isolated
+                Add (SizeOfArray(isolated)) to i
+                Send _ParseObject h isolated (&iLevel)    
+            End
+            
+            //"key":[array]
+            Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "[") Begin
+                Move tokenized[i-1].Val to sKey
+                Send _UnQuote (&sKey)
+                Move (_IsolateArray(Self, i+1, tokenized)) to isolated
+                Send _ParseArray (&va) isolated (&iLevel) 
+                Add (SizeOfArray(isolated)) to i
+                Set Value of hParent sKey to va
+            End            
+        Loop
+
+    End_Procedure
+    
+    Function _IsValidJSON String sJSON Returns Boolean
+        Trim sJSON to sJSON
+        If (Left(sJSON,1) <> "{" and Left(sJSON,1) <> "[") Begin
+            Function_Return False
+        End
+        Else If (Right(sJSON,1) <> "}" and Right(sJSON,1) <> "]") Begin
+            Function_Return False
+        End
+        Function_Return True
+    End_Function
+    
+    Function _IsObject String sJSON Returns Handle
+        Function_Return (Left(sJSON,1) = "{")
+    End_Function
+    
+    Procedure Parse String sJSON Handle Out_hJSONDictionary
+        tRegexMatch[] tokenized
+        Variant[] va
+        
+        If (not(_IsValidJSON(Self, sJSON))) Begin
+            Move 0 to Out_hJSONDictionary
+            Procedure_Return
+        End
+        
+        Set psJSON to sJSON
+
+        Get Regex_Replace sJSON '"$&"' '\d{1,}\.\d{1,}' True to sJSON
+        
+        Get Regex_Match sJSON (_psPattern(Self)) True to tokenized
+
+        Integer iLevel
+        Move 0 to iLevel
+        If (_IsObject(Self, sJSON)) Begin
+            Send _ParseObject Out_hJSONDictionary (_IsolateObject(Self, 0, tokenized)) (&iLevel)
+        End
+        Else Begin
+            Send _ParseArray (&va) (_IsolateArray(Self, 0, tokenized)) (&iLevel)
+            Set Value of Out_hJSONDictionary "_array" to va
+        End
+
+    End_Procedure
+    
+End_Class
