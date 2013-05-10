@@ -1,9 +1,220 @@
 //  cJSONDictionary class:
 //  Created by Erik Svensson and published on eriksven.com in April 2013
+Define cJSONDICTIONARY_INCLUDED for 1
+
+#IFNDEF cHASHTABLE_INCLUDED
 Use cHashTable.pkg
+#ENDIF
+
+#IFNDEF cREGEX_INCLUDED
+Use cRegex.pkg
+#ENDIF
+
+//Data type constants
+Define _jsond_type for Integer
+Define _jsond_null for 0
+Define _jsond_string for 1
+Define _jsond_number for 2
+Define _jsond_object for 4
+Define _jsond_array for 5
+
+Object _oJSONDictionaryErrorSystem is an ErrorSystem
+    Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
+        //Ignore all errors
+    End_Procedure
+End_Object
+
+//Example: _ARRAY_CAST v String to va
+#COMMAND _ARRAY_CAST R L "TO" R .
+    !2[] _arr!2
+    Move !1 to _arr!2
+    If (SizeOfArray(_arr!2) > 0) Begin
+        Move (ResizeArray(!4,0)) to !4
+        For i from 0 to (SizeOfArray(_arr!2)-1)
+            Move _arr!2[i] to !4[i]
+        Loop
+    End
+#ENDCOMMAND
 
 Class cJSONDictionary is a cHashTable
+    
     Procedure Construct_Object
         Forward Send Construct_Object
     End_Procedure
+
+    { Visibility=Public }
+    Function Is_cJSONDictionary Returns Boolean
+        Function_Return True
+    End_Function
+
+    Procedure _Escape String ByRef s
+        //Escaping according to JSON.org
+        Move (Replaces('\',s,'\\'))           to s
+        Move (Replaces('/',s,'\/'))           to s
+        Move (Replaces('"',s,'\"'))           to s                
+        Move (Replaces(Character(8),s,'\b'))  to s
+        Move (Replaces(Character(12),s,'\f')) to s
+        Move (Replaces(Character(10),s,'\n')) to s
+        Move (Replaces(Character(13),s,'\r')) to s
+        Move (Replaces(Character(9),s,'\t'))  to s
+    End_Procedure
+    
+    Function _ArrayCast Variant v Returns Variant[]
+        Variant[] va
+        Integer i
+
+        _ARRAY_CAST v Address  to va
+        _ARRAY_CAST v Integer  to va
+        _ARRAY_CAST v BigInt   to va
+        _ARRAY_CAST v Boolean  to va
+        _ARRAY_CAST v Char     to va
+        _ARRAY_CAST v Currency to va
+        _ARRAY_CAST v Date     to va
+        _ARRAY_CAST v DateTime to va
+        _ARRAY_CAST v Decimal  to va
+        _ARRAY_CAST v Float    to va
+        _ARRAY_CAST v Number   to va
+        _ARRAY_CAST v Real     to va
+        _ARRAY_CAST v RowID    to va
+        _ARRAY_CAST v Short    to va
+        _ARRAY_CAST v String   to va
+        _ARRAY_CAST v Time     to va
+        _ARRAY_CAST v TimeSpan to va
+        _ARRAY_CAST v UBigInt  to va
+        _ARRAY_CAST v UChar    to va
+        _ARRAY_CAST v UInteger to va
+        _ARRAY_CAST v UShort   to va
+        _ARRAY_CAST v Variant  to va
+        
+        Function_Return va
+        
+    End_Function
+    
+    Function _ValueTypeCheck Variant v _jsond_type match Returns Boolean
+        Case Begin
+            Case (match = _jsond_null)
+                Function_Return (v = Character(0))
+            Case Break
+            
+            Case (match = _jsond_string)
+                String s
+                Move (Number(v)) to s
+                Function_Return (String(v) <> s)
+            Case Break
+            
+            Case (match = _jsond_number)
+                Function_Return (Regex_IsMatch(v, "^(-)?(\d+)((.|,)\d+)?$"))
+            Case Break
+        Case End
+
+    End_Function
+    
+    Function _Type Variant v Returns _jsond_type
+
+        If (Is_cJSONDictionary(v))                    Function_Return _jsond_object
+        If (_ValueTypeCheck(Self, v, _jsond_string))  Function_Return _jsond_string
+        If (_ValueTypeCheck(Self, v, _jsond_number))  Function_Return _jsond_number
+        If (_ValueTypeCheck(Self, v, _jsond_null))    Function_Return _jsond_null
+        
+        Function_Return _jsond_array
+    End_Function
+    
+    Function _JSONNumber String s Returns String
+        Integer iDSep ITSep
+        Get_Attribute DF_DECIMAL_SEPARATOR to iDSep
+        Get_Attribute DF_THOUSANDS_SEPARATOR to ITSep
+        Function_Return (Replace(Character(ITSep), Replace(Character(iDSep), s, '.'), ''))
+    End_Function
+    
+    Procedure _Serialize String[] saKeys String ByRef sJSON
+        Integer i ii
+        Variant v
+        Variant[] va
+        String sKey sValue sChildValue
+        _jsond_type type child_type
+
+        Append sJSON '{'
+        
+        For i from 0 to (SizeOfArray(saKeys)-1)
+            Get Value saKeys[i] to v
+            Get _Type v to type
+            Move saKeys[i] to sKey
+            Send _Escape (&sKey)
+            
+            Case Begin
+                
+                Case (type = _jsond_null) 
+                    Move 'null' to sValue
+                Case Break
+
+                Case (type = _jsond_string) 
+                    Move v to sValue
+                    Send _Escape (&sValue)
+                    Move (SFormat('"%1"', sValue)) to sValue
+                Case Break
+
+                Case (type = _jsond_number) 
+                    Move (_JSONNumber(Self, v)) to sValue
+                Case Break
+
+                Case (type = _jsond_object) 
+                    Get Serialize of v to sValue
+                Case Break
+
+                Case (type = _jsond_array) 
+                    
+                    Get _ArrayCast v to va
+                    
+                    Move "[" to sValue
+                    
+                    For ii from 0 to (SizeOfArray(va)-1)
+                        Get _Type va[ii] to child_type
+                        If (child_type = _jsond_null) Begin
+                            Append sValue (SFormat('null%1', If(ii < SizeOfArray(va)-1,',','')))
+                        End         
+                        Else If (child_type = _jsond_string) Begin
+                            Move va[ii] to sChildValue
+                            Send _Escape (&sChildValue)
+                            Append sValue (SFormat('"%1"%2', sChildValue, If(ii < SizeOfArray(va)-1,',','')))
+                        End
+                        Else If (child_type = _jsond_number) Begin
+                            Move va[ii] to sChildValue
+                            Append sValue (SFormat('%1%2', _JSONNumber(Self, sChildValue), If(ii < SizeOfArray(va)-1,',','')))
+                        End
+                        Else If (child_type = _jsond_object) Begin
+                            Get Serialize of va[ii] to sChildValue
+                            Append sValue (SFormat('%1%2', sChildValue, If(ii < SizeOfArray(va)-1,',','')))
+                        End
+                    Loop
+                    
+                    Append sValue "]"
+                Case Break
+                
+            Case End
+            
+            Append sJSON (SFormat('"%1":%2%3', sKey, sValue, If(i < SizeOfArray(saKeys)-1,',',''))) 
+            
+        Loop
+        
+        Append sJSON '}'
+        
+    End_Procedure
+    
+    { Visibility=Public }
+    Function Serialize Returns String
+        String sJSON
+        Handle hPreviousErrorSystem
+        
+        Move Error_Object_Id to hPreviousErrorSystem
+        Move (_oJSONDictionaryErrorSystem) to Error_Object_Id
+        
+        Move "" to sJSON
+        
+        Send _Serialize (Keys(Self)) (&sJSON)
+        
+        Move hPreviousErrorSystem to Error_Object_Id
+
+        Function_Return sJSON
+    End_Function
+
 End_Class

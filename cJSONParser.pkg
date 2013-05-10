@@ -1,7 +1,14 @@
 //  cJSONParser class:
 //  Created by Erik Svensson and published on eriksven.com in April 2013
+Define cJSONPARSER_INCLUDED for 1
+
+#IFNDEF cJSONDICTIONARY_INCLUDED
 Use cJSONDictionary.pkg
+#ENDIF
+
+#IFNDEF cREGEX_INCLUDED
 Use cRegex.pkg
+#ENDIF
 
 Class cJSONParser is a cObject
     
@@ -11,7 +18,12 @@ Class cJSONParser is a cObject
         Property String psJSON
     End_Procedure
     
-    Procedure _UnQuote String ByRef s
+    { Visibility=Public }
+    Function Is_cJSONParser Returns Boolean
+        Function_Return True
+    End_Function
+    
+    Procedure _UnEscape String ByRef s
         If (Left(s,1) = '"' and Right(s,1) = '"') Begin
             Move (Right(s,Length(s)-1)) to s
             Move (Left(s, Length(s)-1)) to s
@@ -91,7 +103,7 @@ Class cJSONParser is a cObject
                 //value
                 Else Begin
                     Move tokenized[i].Val to sValue
-                    Send _UnQuote (&sValue)
+                    Send _UnEscape (&sValue)
                     Move sValue to vaParent[(SizeOfArray(vaParent))]
                 End      
             
@@ -113,8 +125,8 @@ Class cJSONParser is a cObject
             If (tokenized[i].Val = ":" and tokenized[i+1].Val <> "{" and tokenized[i+1].Val <> "[") Begin
                 Move tokenized[i-1].Val to sKey
                 Move tokenized[i+1].Val to sValue
-                Send _UnQuote (&sKey)
-                Send _UnQuote (&sValue)
+                Send _UnEscape (&sKey)
+                Send _UnEscape (&sValue)
                 Set Value of hParent sKey to sValue
             End
             
@@ -122,7 +134,7 @@ Class cJSONParser is a cObject
             Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "{") Begin
                 Get Create U_cJSONDictionary to h
                 Move tokenized[i-1].Val to sKey
-                Send _UnQuote (&sKey)
+                Send _UnEscape (&sKey)
                 Set Value of hParent sKey to h
                 Increment iLevel
                 Move (_IsolateObject(Self, i+1, tokenized)) to isolated
@@ -133,7 +145,7 @@ Class cJSONParser is a cObject
             //"key":[array]
             Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "[") Begin
                 Move tokenized[i-1].Val to sKey
-                Send _UnQuote (&sKey)
+                Send _UnEscape (&sKey)
                 Move (_IsolateArray(Self, i+1, tokenized)) to isolated
                 Send _ParseArray (&va) isolated (&iLevel) 
                 Add (SizeOfArray(isolated)) to i
@@ -158,6 +170,7 @@ Class cJSONParser is a cObject
         Function_Return (Left(sJSON,1) = "{")
     End_Function
     
+    { Visibility=Public }
     Procedure Parse String sJSON Handle Out_hJSONDictionary
         tRegexMatch[] tokenized
         Variant[] va
@@ -184,5 +197,5 @@ Class cJSONParser is a cObject
         End
 
     End_Procedure
-    
+
 End_Class
