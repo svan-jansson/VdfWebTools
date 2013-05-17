@@ -46,7 +46,7 @@ Class cWebClient is a cObject
         Property String psProxy ""
         Property String psUserName ""
         Property String psPassword ""
-        Property String psUserAgent "Visual Dataflex"
+        Property String psUserAgent "Visual Dataflex cWebClient"
         Property Integer piHttpPort 80
         Property Integer piHttpsPort 443
         Property Integer piFtpPort 21
