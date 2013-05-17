@@ -198,7 +198,7 @@ Class cWebClient is a cObject
                                                  (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) sData bIsFile to iStatus
         Function_Return (iStatus <> 0)
     End_Function
-    
+
     {Visibility="Public"}
     Procedure Set RequestHeader String sHeaderName String sHeaderValue
         Handle hTransfer
@@ -211,6 +211,11 @@ Class cWebClient is a cObject
         End
         Get phTransfer to hTransfer
         Get AddHeader of hTransfer sHeaderName sHeaderValue to i
+    End_Procedure
+
+    {Visibility="Public"}
+    Procedure ClearRequestHeaders
+        Send ClearHeaders of (phTransfer(Self))
     End_Procedure
     
     {Visibility="Public"}
