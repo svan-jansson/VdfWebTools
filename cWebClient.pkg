@@ -1,0 +1,297 @@
+// cWebClient class v1.00:
+// Created by Erik Svensson and published on eriksven.com in May 2013
+// License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
+Define cWEBCLIENT_INCLUDED for 1
+
+Use CharTranslate.pkg
+
+#IFNDEF cREGEX_INCLUDED
+Use cRegex.pkg
+#ENDIF
+
+Class _cWebClientHttpTransfer is a cHttpTransfer
+    Procedure Construct_Object
+        Forward Send Construct_Object
+        Property String psDownloadedData ""
+        Property String psDownloadedContentType ""
+    End_Procedure
+    
+    Procedure OnDataReceived String sContentType String sData
+        String sDownloadedData
+        Get psDownloadedData to sDownloadedData
+        Append sDownloadedData (Trim(sData))
+        Set psDownloadedContentType to sContentType
+        Set psDownloadedData to sDownloadedData
+    End_Procedure
+End_Class
+
+Struct _tcWebClientUri
+    String Protocol
+    String Hostname
+    Integer Port
+    String Path
+    String Name
+    String Query
+    String Hash
+End_Struct
+
+Define cwcUTF8 for 0
+Define cwcANSI for 1
+Define cwcOEM  for 2
+
+Class cWebClient is a cObject
+    Procedure Construct_Object
+        Forward Send Construct_Object
+        
+        Property String psProxy ""
+        Property String psUserName ""
+        Property String psPassword ""
+        Property String psUserAgent "Visual Dataflex"
+        Property Integer piHttpPort 80
+        Property Integer piHttpsPort 443
+        Property Integer piFtpPort 21
+        Property Integer piFtpsPort 990
+        Property Integer piUploadEncoding cwcUTF8
+        Property Integer piDownloadEncoding cwcUTF8
+
+        Property Integer piResponseStatus
+        
+        Property Handle phTransfer (Create(Self, U__cWebClientHttpTransfer))
+        Property Boolean pbAcceptHeaderAdded False
+        Property Boolean pbContentTypeHeaderAdded False
+        
+        Send ClearHeaders of (phTransfer(Self))
+        
+    End_Procedure
+
+    Function _URISegments String sURL Returns _tcWebClientUri
+        String sPattern
+        _tcWebClientUri Uri
+        Move "^(\w+):\/{2}([^\/:]+)(?:\:(\d+))?(\/(?:[^?]+\/)?)?([^\?#]+)?(?:\?([^#]*))?(\#.*)?$" to sPattern
+        Trim (Regex_Replace(sURL, "$1", sPattern, True)) to Uri.Protocol
+        Trim (Regex_Replace(sURL, "$2", sPattern, True)) to Uri.Hostname
+        Trim (Regex_Replace(sURL, "$3", sPattern, True)) to Uri.Port
+        Trim (Regex_Replace(sURL, "$4", sPattern, True)) to Uri.Path
+        Trim (Regex_Replace(sURL, "$5", sPattern, True)) to Uri.Name
+        Trim (Regex_Replace(sURL, "$6", sPattern, True)) to Uri.Query
+        Trim (Regex_Replace(sURL, "$7", sPattern, True)) to Uri.Hash
+        Function_Return Uri
+    End_Function
+    
+    Function _RemotePort _tcWebClientUri Uri Handle hTransfer Returns Integer
+        If (Uri.Port > 0) Begin
+            Function_Return Uri.Port
+        End
+        If (Regex_IsMatch(Uri.Protocol,"^http$",True)) Begin
+            Function_Return (piHttpPort(Self))
+        End
+        Else If (Regex_IsMatch(Uri.Protocol,"^https$",True)) Begin
+            Set peTransferFlags of hTransfer to ifSecure
+            Function_Return (piHttpsPort(Self))
+        End
+        Else If (Regex_IsMatch(Uri.Protocol,"^ftp$",True)) Begin
+            Function_Return (piFtpPort(Self))
+        End
+        Else If (Regex_IsMatch(Uri.Protocol,"^ftps$",True)) Begin
+            Set peTransferFlags of hTransfer to ifSecure
+            Function_Return (piFtpsPort(Self))
+        End
+        Function_Return (piHttpPort(Self))
+    End_Function
+    
+    Function _ValidateAndFormatURL String sURL Returns String
+        If (not(Regex_IsMatch(sURL, "^(http(s?)|ftp(s?)):\/\/.*$", True))) Begin
+            Move ("http://" + sURL) to sURL
+        End
+        Function_Return sURL
+    End_Function
+    
+    Function _DecodeResponse String sData Returns String
+        Address aOEM
+        String sOEM
+        Boolean bOk
+        String sContentType
+        Get ResponseHeader "Content-Type" to sContentType
+        If (piDownloadEncoding(Self) = cwcUTF8 or Regex_IsMatch(sContentType,".*utf(-?)8.*",True)) Begin
+            Move (Utf8ToOemBuffer(AddressOf(sData), CStringLength(sData))) to aOEM
+            Move aOEM to sOEM
+            Move (Free(aOEM)) to bOk
+            Function_Return sOEM
+        End
+        Else If (piDownloadEncoding(Self) = cwcANSI) Begin
+            Function_Return (ToOEM(sData))
+        End
+        Else Begin
+            Function_Return sData
+        End
+    End_Function
+    
+    Function _EncodeRequest String sData Returns String
+        Address aEncoded
+        Boolean bOk
+        String sEncoded
+        If (piUploadEncoding(Self) = cwcUTF8) Begin
+            Move (OemToUtf8Buffer(AddressOf(sData),CStringLength(sData))) to aEncoded
+            Move aEncoded to sEncoded
+            Move (Free(aEncoded)) to bOk
+            Function_Return sEncoded
+        End
+        Else If (piUploadEncoding(Self) = cwcANSI) Begin
+            Function_Return (ToANSI(sData))
+        End
+        Else Begin
+            Function_Return sData
+        End
+    End_Function
+    
+    Procedure _StoreStatus Handle hTransfer
+        Set piResponseStatus to (ResponseStatusCode(hTransfer))
+    End_Procedure
+    
+    Procedure _PrepareRequest _tcWebClientUri Uri Handle hTransfer
+        If (not(pbAcceptHeaderAdded(Self))) Begin
+            Set RequestHeader "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        End
+        Set psRemoteHost of hTransfer to Uri.Hostname
+        Set piRemotePort of hTransfer to (_RemotePort(Self, Uri, hTransfer))
+        Set psAgent of hTransfer to (psUserAgent(Self))
+        Set psProxy of hTransfer to (psProxy(Self))
+        Set psUsername of hTransfer to (psUsername(Self))
+        Set psPassword of hTransfer to (psPassword(Self))
+    End_Procedure
+
+    Function _DoGetRequest String sURL Handle hTransfer Returns Boolean
+        _tcWebClientUri Uri
+        Integer iStatus
+        Get _URISegments sURL to Uri
+        Send _PrepareRequest Uri hTransfer
+        Get HTTPGetRequest of hTransfer (SFormat("%1%2%3%4", ;
+                                                 Uri.Path, ;
+                                                 Uri.Name, ;
+                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
+                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) to iStatus
+        
+        Function_Return (iStatus <> 0)
+    End_Function
+    
+    Function _DoPostRequest String sUrl String sData Handle hTransfer Boolean bIsFile Returns Boolean
+        _tcWebClientUri Uri
+        Integer iStatus
+        String sEncoded
+        Get _URISegments sURL to Uri
+        Send _PrepareRequest Uri hTransfer
+        If (not(bIsFile)) Begin
+            Get _EncodeRequest sData to sData
+        End
+        If (not(pbContentTypeHeaderAdded(Self))) Begin
+            If (piUploadEncoding(Self) = cwcUTF8) Begin
+                Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded; charset=utf-8"
+            End
+            Else Begin
+                Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded"
+            End
+        End
+        Get HttpPostRequest of hTransfer (SFormat("%1%2%3%4", ;
+                                                 Uri.Path, ;
+                                                 Uri.Name, ;
+                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
+                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) sData bIsFile to iStatus
+        Function_Return (iStatus <> 0)
+    End_Function
+    
+    {Visibility="Public"}
+    Procedure Set RequestHeader String sHeaderName String sHeaderValue
+        Handle hTransfer
+        Integer i
+        If (Trim(Uppercase(sHeaderName)) = "ACCEPT") Begin
+            Set pbAcceptHeaderAdded to True
+        End
+        If (Trim(Uppercase(sHeaderName)) = "CONTENT-TYPE") Begin
+            Set pbContentTypeHeaderAdded to True
+        End
+        Get phTransfer to hTransfer
+        Get AddHeader of hTransfer sHeaderName sHeaderValue to i
+    End_Procedure
+    
+    {Visibility="Public"}
+    Function ResponseHeader String sHeaderName Returns String
+        Handle hTransfer
+        String sHeaderValue
+        Get phTransfer to hTransfer
+        Get ResponseHeader of hTransfer sHeaderName 0 to sHeaderValue
+        Function_Return sHeaderValue
+    End_Function
+    
+    {Visibility="Public"}
+    Function DownloadString String sUrl Returns String
+        Handle hTransfer
+        Boolean bOk
+        String sString
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Get _DoGetRequest sUrl hTransfer to bOk
+        If (bOk) Begin
+            Get psDownloadedData of hTransfer to sString
+        End
+        Else Begin
+            Move "" to sString
+        End
+        Send _StoreStatus hTransfer
+        Get _DecodeResponse sString to sString
+        Function_Return sString
+    End_Function
+    
+    {Visibility="Public"}
+    Function UploadString String sUrl String sData Returns String
+        Handle hTransfer
+        Boolean bOk
+        String sString
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Get _DoPostRequest sUrl sData hTransfer False to bOk
+        If (bOk) Begin
+            Get psDownloadedData of hTransfer to sString
+        End
+        Else Begin
+            Move "" to sString
+        End
+        Send _StoreStatus hTransfer
+        Get _DecodeResponse sString to sString
+        Function_Return sString
+    End_Function
+    
+    {Visibility="Public"}
+    Function DownloadFile String sUrl String sFileName Returns Boolean
+        Boolean bExists bOk
+        Handle hTransfer
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Set psSaveAsFile of hTransfer to sFileName
+        Get _DoGetRequest sUrl hTransfer to bOk
+        If (bOk) Begin
+           File_Exist sFileName bExists
+           Move bExists to bOk 
+        End
+        Send Destroy of hTransfer
+        Function_Return bOk
+    End_Function
+    
+    {Visibility="Public"}
+    Function UploadFile String sUrl String sFile Returns String
+        Handle hTransfer
+        Boolean bOk
+        String sString
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Get _DoPostRequest sUrl sFile hTransfer True to bOk
+        If (bOk) Begin
+            Get psDownloadedData of hTransfer to sString
+        End
+        Else Begin
+            Move "" to sString
+        End
+        Send _StoreStatus hTransfer
+        Get _DecodeResponse sString to sString
+        Function_Return sString
+    End_Function
+End_Class

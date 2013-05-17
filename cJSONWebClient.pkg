@@ -1,0 +1,113 @@
+// cJSONClient class v1.00:
+// Created by Erik Svensson and published on eriksven.com in May 2013
+// License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
+Define cJSONCLIENT_INCLUDED for 1
+
+#IFNDEF cWEBCLIENT_INCLUDED
+Use cWebClient.pkg
+#ENDIF
+
+#IFNDEF cJSONDICTIONARY_INCLUDED
+Use cJSONDictionary.pkg
+#ENDIF
+
+#IFNDEF cJSONPARSER_INCLUDED
+Use cJSONParser.pkg
+#ENDIF
+
+Class cJSONWebClient is a cWebClient
+    Procedure Construct_Object
+        Forward Send Construct_Object
+    End_Procedure
+    
+    Procedure _PrepareGetRequest
+        Set RequestHeader "Accept" to "application/json"
+    End_Procedure
+    
+    Procedure _PreparePostRequest
+        Send _PrepareGetRequest
+        If (piUploadEncoding(Self) = cwcUTF8) Begin
+            Set RequestHeader "Content-Type" to "application/json;charset=utf-8"
+        End
+        Else Begin
+            Set RequestHeader "Content-Type" to "application/json"
+        End
+    End_Procedure
+    
+    Function _WrapResponseIfNeeded String sJSON Handle hJSONDictionary Returns Boolean
+        String sVal
+        Move (Trim(sJSON)) to sJSON
+        If ((Left(sJSON,1) <> "{" and Right(sJSON,1) <> "}") and (Left(sJSON,1) <> "[" and Right(sJSON,1) <> "]")) Begin
+            If (Left(sJSON,1) = '"' and Right(sJSON,1) = '"') Begin
+                Move (Right(sJSON,Length(sJSON)-1)) to sJSON
+                Move (Left(sJSON, Length(sJSON)-1)) to sJSON
+            End
+            Move (Replaces('\"',sJSON,'"')) to sJSON
+            Move (Replaces('\\',sJSON,'\')) to sJSON
+            Move (Replaces('\/',sJSON,'/')) to sJSON
+            Move (Replaces('\b',sJSON,Character(8)))  to sJSON
+            Move (Replaces('\f',sJSON,Character(12))) to sJSON
+            Move (Replaces('\n',sJSON,Character(10))) to sJSON
+            Move (Replaces('\r',sJSON,Character(13))) to sJSON
+            Move (Replaces('\t',sJSON,Character(9)))  to sJSON
+            Set Value of hJSONDictionary "response" to sJSON
+            Function_Return True
+        End
+        Function_Return False
+    End_Function
+    
+    {Visibility="Public"}
+    Function DownloadJSON String sUrl Returns Handle
+        Send _PrepareGetRequest
+        String sJSON
+        Handle hJSONDictionary hJSONParser
+        Get DownloadString sUrl to sJSON
+        If (piResponseStatus(Self) <> 200) Begin
+            Function_Return 0
+        End
+        Get Create U_cJSONDictionary to hJSONDictionary
+        If (_WrapResponseIfNeeded(Self, sJSON, hJSONDictionary)) Begin
+            Function_Return hJSONDictionary
+        End
+        Get Create U_cJSONParser to hJSONParser
+        Send Parse of hJSONParser sJSON hJSONDictionary
+        Send Destroy of hJSONParser
+        Function_Return hJSONDictionary
+    End_Function
+    
+    {Visibility="Public"}
+    Function DownloadJSONString String sUrl Returns String
+        Send _PrepareGetRequest
+        String sJSON
+        Get DownloadString sUrl to sJSON
+        Function_Return sJSON
+    End_Function
+    
+    {Visibility="Public"}
+    Function UploadJSON String sUrl Handle hJSONDictonary Returns Handle
+        Send _PreparePostRequest
+        String sJSON sResponse
+        Handle hJSONDictionary hJSONParser
+        Get Serialize of hJSONDictonary to sJSON
+        Get UploadString sUrl sJSON to sResponse
+        If (piResponseStatus(Self) <> 200) Begin
+            Function_Return 0
+        End
+        Get Create U_cJSONDictionary to hJSONDictionary
+        If (_WrapResponseIfNeeded(Self, sResponse, hJSONDictionary)) Begin
+            Function_Return hJSONDictionary
+        End
+        Get Create U_cJSONParser to hJSONParser
+        Send Parse of hJSONParser sJSON hJSONDictionary
+        Send Destroy of hJSONParser
+        Function_Return hJSONDictionary
+    End_Function
+    
+    {Visibility="Public"}
+    Function UploadJSONString String sUrl String sJSON Returns String
+        Send _PreparePostRequest
+        String sResponse
+        Get UploadString sUrl sJSON to sResponse
+        Function_Return sResponse
+    End_Function
+End_Class
