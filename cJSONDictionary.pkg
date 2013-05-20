@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.01:
+// cJSONDictionary class v1.02:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -19,11 +19,11 @@ Define _jsond_number for 2
 Define _jsond_object for 4
 Define _jsond_array for 5
 
-Object _oJSONDictionaryErrorSystem is an ErrorSystem
+Class _cJSONDictionaryErrorSystem is an ErrorSystem
     Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
         //Ignore all errors
     End_Procedure
-End_Object
+End_Class
 
 //Example: _ARRAY_CAST v String to va
 #COMMAND _ARRAY_CAST R L "TO" R .
@@ -207,12 +207,13 @@ Class cJSONDictionary is a cHashTable
         Handle hPreviousErrorSystem
         
         Move Error_Object_Id to hPreviousErrorSystem
-        Move (_oJSONDictionaryErrorSystem) to Error_Object_Id
+        Move (Create(Self,U__cJSONDictionaryErrorSystem)) to Error_Object_Id
         
         Move "" to sJSON
         
         Send _Serialize (Keys(Self)) (&sJSON)
         
+        Send Destroy of Error_Object_Id
         Move hPreviousErrorSystem to Error_Object_Id
 
         Function_Return sJSON

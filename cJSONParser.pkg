@@ -1,4 +1,4 @@
-// cJSONParser class v1.01:
+// cJSONParser class v1.02:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -87,7 +87,7 @@ Class cJSONParser is a cObject
             
                 //{object}
                 If (tokenized[i].Val = "{") Begin
-                    Get Create U_cJSONDictionary to h
+                    Get Create of Desktop U_cJSONDictionary to h
                     Move h to vaParent[(SizeOfArray(vaParent))]
                     Get _IsolateObject i tokenized to isolated
                     Send _ParseObject h isolated (iLevel+1)
