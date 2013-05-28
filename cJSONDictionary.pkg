@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.02:
+// cJSONDictionary class v1.03:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -110,14 +110,16 @@ Class cJSONDictionary is a cHashTable
 
     End_Function
     
-    Function _Type Variant v Returns _jsond_type
-
+    Function _Type Variant v  Returns _jsond_type
+        Variant[] va
+        
+        Move v to va
+        If (SizeOfArray(va) > 0)                      Function_Return _jsond_array
         If (Is_cJSONDictionary(v))                    Function_Return _jsond_object
         If (_ValueTypeCheck(Self, v, _jsond_string))  Function_Return _jsond_string
         If (_ValueTypeCheck(Self, v, _jsond_number))  Function_Return _jsond_number
         If (_ValueTypeCheck(Self, v, _jsond_null))    Function_Return _jsond_null
-        
-        Function_Return _jsond_array
+
     End_Function
     
     Function _JSONNumber String s Returns String
