@@ -1,4 +1,4 @@
-// cJSONParser class v1.03:
+// cJSONParser class v1.04:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -17,7 +17,8 @@ Class cJSONParser is a cObject
     Procedure Construct_Object
         Forward Send Construct_Object
         Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d+|\{|\}|\:|[a-zA-Z0-9_\.]+)'
-        Property String psJSON
+        Property String psJSON         
+        Property Handle phOutDictionary 0
     End_Procedure
     
     { Visibility=Public }
@@ -87,7 +88,7 @@ Class cJSONParser is a cObject
             
                 //{object}
                 If (tokenized[i].Val = "{") Begin
-                    Get Create of Desktop U_cJSONDictionary to h
+                    Get Create of (phOutDictionary(Self)) U_cJSONDictionary to h
                     Move h to vaParent[(SizeOfArray(vaParent))]
                     Get _IsolateObject i tokenized to isolated
                     Send _ParseObject h isolated (iLevel+1)
@@ -134,7 +135,7 @@ Class cJSONParser is a cObject
             
             //"key":{object}
             Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "{") Begin
-                Get Create of Desktop U_cJSONDictionary to h
+                Get Create of (phOutDictionary(Self)) U_cJSONDictionary to h
                 Move tokenized[i-1].Val to sKey
                 Send _UnEscape (&sKey)
                 Set Value of hParent sKey to h
@@ -181,6 +182,8 @@ Class cJSONParser is a cObject
             Move 0 to Out_hJSONDictionary
             Procedure_Return
         End
+        
+        Set phOutDictionary to Out_hJSONDictionary
         
         Set psJSON to sJSON
 
