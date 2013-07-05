@@ -19,11 +19,19 @@ Define _jsond_number for 2
 Define _jsond_object for 4
 Define _jsond_array for 5
 
+#IFNDEF Is$WebApp
 Class _cJSONDictionaryErrorSystem is an ErrorSystem
     Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
         //Ignore all errors
     End_Procedure
 End_Class
+#ELSE
+Class _cJSONDictionaryErrorSystem is an cWebAppError
+    Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
+        //Ignore all errors
+    End_Procedure
+End_Class
+#ENDIF
 
 //Example: _ARRAY_CAST v String to va
 #COMMAND _ARRAY_CAST R L "TO" R .
@@ -109,11 +117,11 @@ Class cJSONDictionary is a cHashTable
         Case End
 
     End_Function
-    
+
     Function _Type Variant v  Returns _jsond_type
         Variant[] va
         
-        Move v to va
+        Get _ArrayCast v to va
         If (SizeOfArray(va) > 0)                      Function_Return _jsond_array
         If (Is_cJSONDictionary(v))                    Function_Return _jsond_object
         If (_ValueTypeCheck(Self, v, _jsond_string))  Function_Return _jsond_string
