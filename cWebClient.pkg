@@ -1,4 +1,4 @@
-// cWebClient class v1.00:
+// cWebClient class v1.01:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
@@ -60,6 +60,7 @@ Class cWebClient is a cObject
         Property Boolean pbAcceptHeaderAdded False
         Property Boolean pbContentTypeHeaderAdded False
         
+        Set psAcceptTypes of (phTransfer(Self)) to ""
         Send ClearHeaders of (phTransfer(Self))
         
     End_Procedure
