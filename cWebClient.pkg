@@ -1,9 +1,10 @@
-// cWebClient class v1.02:
+// cWebClient class v1.03:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
 
 Use CharTranslate.pkg
+Use cHttpTransfer.pkg
 
 #IFNDEF cREGEX_INCLUDED
 Use cRegex.pkg
