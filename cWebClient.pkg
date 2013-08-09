@@ -1,4 +1,4 @@
-// cWebClient class v1.01:
+// cWebClient class v1.02:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
@@ -14,6 +14,12 @@ Class _cWebClientHttpTransfer is a cHttpTransfer
         Forward Send Construct_Object
         Property String psDownloadedData ""
         Property String psDownloadedContentType ""
+        Set psRemoteHost to "sandbox.printfleet.com"
+    End_Procedure
+    
+    Procedure _ClearDataReceived
+        Set psDownloadedContentType to ""
+        Set psDownloadedData to ""
     End_Procedure
     
     Procedure OnDataReceived String sContentType String sData
@@ -114,6 +120,11 @@ Class cWebClient is a cObject
         String sContentType
         Get ResponseHeader "Content-Type" to sContentType
         If (piDownloadEncoding(Self) = cwcUTF8 or Regex_IsMatch(sContentType,".*utf(-?)8.*",True)) Begin
+            //Remove UTF-8 BOM characters (0xEF 0xBB 0xBF)
+            If (Length(sData) >= 3 and Ascii(Mid(sData,1,1)) = 239 and Ascii(Mid(sData,1,2)) = 187 and Ascii(Mid(sData,1,3)) = 191) Begin
+                Move (Mid(sData, Length(sData)-3, 4)) to sData
+            End
+            
             Move (Utf8ToOemBuffer(AddressOf(sData), CStringLength(sData))) to aOEM
             Move aOEM to sOEM
             Move (Free(aOEM)) to bOk
@@ -164,6 +175,7 @@ Class cWebClient is a cObject
     Function _DoGetRequest String sURL Handle hTransfer Returns Boolean
         _tcWebClientUri Uri
         Integer iStatus
+        Send _ClearDataReceived of (phTransfer(Self))
         Get _URISegments sURL to Uri
         Send _PrepareRequest Uri hTransfer
         Get HTTPGetRequest of hTransfer (SFormat("%1%2%3%4", ;
@@ -179,6 +191,7 @@ Class cWebClient is a cObject
         _tcWebClientUri Uri
         Integer iStatus
         String sEncoded
+        Send _ClearDataReceived of (phTransfer(Self))
         Get _URISegments sURL to Uri
         Send _PrepareRequest Uri hTransfer
         If (not(bIsFile)) Begin
