@@ -1,4 +1,4 @@
-// cJSONParser class v1.04:
+// cJSONParser class v1.06:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -16,7 +16,7 @@ Class cJSONParser is a cObject
     
     Procedure Construct_Object
         Forward Send Construct_Object
-        Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d+|\{|\}|\:|[a-zA-Z0-9_\.]+)'
+        Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d{1,}\.\d{1,}|\{|\}|\:|[a-zA-Z0-9_\.]+)'
         Property String psJSON         
         Property Handle phOutDictionary 0
     End_Procedure
@@ -79,6 +79,7 @@ Class cJSONParser is a cObject
     Procedure _ParseArray Variant[] ByRef vaParent tRegexMatch[] tokenized Integer iLevel
         Integer i
         String sKey sValue
+        Variant vValue
         Handle h
         tRegexMatch[] isolated
         Variant[] va
@@ -105,9 +106,11 @@ Class cJSONParser is a cObject
                 
                 //value
                 Else Begin
-                    Move tokenized[i].Val to sValue
+                    Move tokenized[i].Val to vValue
+                    Move vValue to sValue
                     Send _UnEscape (&sValue)
-                    Move sValue to vaParent[(SizeOfArray(vaParent))]
+                    If (vValue <> sValue) Move sValue to vValue
+                    Move vValue to vaParent[(SizeOfArray(vaParent))]
                 End      
             
             End
@@ -118,6 +121,7 @@ Class cJSONParser is a cObject
     Procedure _ParseObject Handle hParent tRegexMatch[] tokenized Integer ByRef iLevel
         Integer i ii
         String sKey sValue sText
+        Variant vValue
         Handle h
         Variant[] va
         tRegexMatch[] isolated
@@ -127,10 +131,12 @@ Class cJSONParser is a cObject
             //"key":"value"
             If (tokenized[i].Val = ":" and tokenized[i+1].Val <> "{" and tokenized[i+1].Val <> "[") Begin
                 Move tokenized[i-1].Val to sKey
-                Move tokenized[i+1].Val to sValue
+                Move tokenized[i+1].Val to vValue
+                Move vValue to sValue
                 Send _UnEscape (&sKey)
                 Send _UnEscape (&sValue)
-                Set Value of hParent sKey to sValue
+                If (vValue <> sValue) Move sValue to vValue
+                Set Value of hParent sKey to vValue
             End
             
             //"key":{object}
@@ -187,8 +193,6 @@ Class cJSONParser is a cObject
         
         Set psJSON to sJSON
 
-        Get Regex_Replace sJSON '"$&"' '\d{1,}\.\d{1,}' True to sJSON
-        
         Get Regex_Match sJSON (_psPattern(Self)) True to tokenized
 
         Integer iLevel
