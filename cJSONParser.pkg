@@ -1,4 +1,4 @@
-// cJSONParser class v1.06:
+// cJSONParser class v1.07:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -19,6 +19,7 @@ Class cJSONParser is a cObject
         Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d{1,}\.\d{1,}|\{|\}|\:|[a-zA-Z0-9_\.]+)'
         Property String psJSON         
         Property Handle phOutDictionary 0
+        Property Boolean pbAutoParseMicrosoftDates True
     End_Procedure
     
     { Visibility=Public }
@@ -26,6 +27,37 @@ Class cJSONParser is a cObject
         Function_Return True
     End_Function
     
+    Function _IsMicrosoftDate String s Returns Boolean
+        If (not(pbAutoParseMicrosoftDates(Self))) Function_Return False
+        Function_Return (Regex_IsMatch(s, '^\/Date\(\d+((\-|\+)\d{4})?\)\/$', True))
+    End_Function
+    
+    Function _ParseMicrosoftDate String s Returns DateTime
+        BigInt iDate iDays iDateOffset
+        Integer HH MM SS MS
+        DateTime dt1970 dtRetVal
+        Date d1970 dDate
+        TimeSpan ts
+        Get Regex_Replace s "" "\/Date\(|-.*" True to iDate
+        Move (DateSetYear(dt1970, 1970)) to dt1970
+        Move (DateSetMonth(dt1970, 1)) to dt1970
+        Move (DateSetDay(dt1970, 1)) to dt1970      
+        Move (((((iDate/1000)/60)/60)/24)/1) to iDays
+        Move (iDate - (iDays * 1000 * 60 * 60 * 24)) to iDateOffset
+        Move (((iDateOffset / 1000) / 60) / 60) to HH
+        Move (((iDateOffset / 1000) / 60) - (HH*60)) to MM
+        Move ((iDateOffset / 1000) - ((HH*60*60) + (MM*60))) to SS
+        Move ((iDateOffset) - ((HH*60*60*1000) + (MM*60*1000) + (SS*1000))) to MS
+        Move dt1970 to d1970
+        Move (d1970 + iDays) to dDate
+        Move dDate to dtRetVal
+        Move (DateSetHour(dtRetVal, HH)) to dtRetVal
+        Move (DateSetMinute(dtRetVal, MM)) to dtRetVal
+        Move (DateSetSecond(dtRetVal, SS)) to dtRetVal
+        Move (DateSetMillisecond(dtRetVal, MS)) to dtRetVal
+        Function_Return dtRetVal
+    End_Function
+
     Procedure _UnEscape String ByRef s
         If (Left(s,1) = '"' and Right(s,1) = '"') Begin
             Move (Right(s,Length(s)-1)) to s
@@ -110,6 +142,9 @@ Class cJSONParser is a cObject
                     Move vValue to sValue
                     Send _UnEscape (&sValue)
                     If (vValue <> sValue) Move sValue to vValue
+                    If (_IsMicrosoftDate(Self, vValue)) Begin
+                        Get _ParseMicrosoftDate vValue to vValue
+                    End
                     Move vValue to vaParent[(SizeOfArray(vaParent))]
                 End      
             
@@ -136,6 +171,9 @@ Class cJSONParser is a cObject
                 Send _UnEscape (&sKey)
                 Send _UnEscape (&sValue)
                 If (vValue <> sValue) Move sValue to vValue
+                If (_IsMicrosoftDate(Self, vValue)) Begin
+                    Get _ParseMicrosoftDate vValue to vValue
+                End
                 Set Value of hParent sKey to vValue
             End
             
