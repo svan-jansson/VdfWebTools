@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.04:
+// cJSONDictionary class v1.05:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -211,6 +211,19 @@ Class cJSONDictionary is a cHashTable
         
     End_Procedure
     
+    { Visibility=Public }
+    Procedure Set MicrosoftDateValue String sKey DateTime dt
+        TimeSpan ts
+        Real ms
+        DateTime dt1970
+        Move (DateSetYear(dt1970, 1970)) to dt1970
+        Move (DateSetMonth(dt1970, 1)) to dt1970
+        Move (DateSetDay(dt1970, 1)) to dt1970
+        Move (dt - dt1970) to ts
+        Move (SpanTotalMilliseconds(ts)) to ms
+        Set Value sKey to (SFormat("/Date(%1)/", ms))
+    End_Procedure
+        
     { Visibility=Public }
     Function Serialize Returns String
         String sJSON
