@@ -1,4 +1,4 @@
-// cWebClient class v1.03:
+// cWebClient class v1.04:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
@@ -26,7 +26,7 @@ Class _cWebClientHttpTransfer is a cHttpTransfer
     Procedure OnDataReceived String sContentType String sData
         String sDownloadedData
         Get psDownloadedData to sDownloadedData
-        Append sDownloadedData (Trim(sData))
+        Append sDownloadedData sData
         Set psDownloadedContentType to sContentType
         Set psDownloadedData to sDownloadedData
     End_Procedure
