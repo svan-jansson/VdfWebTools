@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.06:
+// cJSONDictionary class v1.07:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -40,7 +40,11 @@ End_Class
     If (SizeOfArray(_arr!2) > 0) Begin
         Move (ResizeArray(!4,0)) to !4
         For i from 0 to (SizeOfArray(_arr!2)-1)
-            Move _arr!2[i] to !4[i]
+            #IFSAME !2 Number Decimal Real
+                Move (Cast(_arr!2[i], Real)) to !4[i]
+            #ELSE
+                Move _arr!2[i] to !4[i]
+            #ENDIF
         Loop
     End
 #ENDCOMMAND

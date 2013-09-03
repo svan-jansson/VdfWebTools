@@ -1,4 +1,4 @@
-// cJSONParser class v1.09:
+// cJSONParser class v1.10:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -38,7 +38,7 @@ Class cJSONParser is a cObject
         DateTime dt1970 dtRetVal
         Date d1970 dDate
         TimeSpan ts
-        Get Regex_Replace s "" "\/Date\(|-.*" True to iDate
+        Get Regex_Replace s "$1" "\/Date\((-?\d+)(\)|-\d+\))\/" True to iDate
         Move (DateSetYear(dt1970, 1970)) to dt1970
         Move (DateSetMonth(dt1970, 1)) to dt1970
         Move (DateSetDay(dt1970, 1)) to dt1970      
