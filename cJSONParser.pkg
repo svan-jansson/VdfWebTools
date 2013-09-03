@@ -1,4 +1,4 @@
-// cJSONParser class v1.08:
+// cJSONParser class v1.09:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -225,7 +225,8 @@ Class cJSONParser is a cObject
         Variant[] va
         
         If (not(_IsValidJSON(Self, sJSON))) Begin
-            Move 0 to Out_hJSONDictionary
+            Move False to Found
+            Move True to FindErr
             Procedure_Return
         End
         
@@ -244,7 +245,9 @@ Class cJSONParser is a cObject
             Send _ParseArray (&va) (_IsolateArray(Self, 0, tokenized)) (&iLevel)
             Set Value of Out_hJSONDictionary "_array" to va
         End
-
+        
+        Move True to Found
+        Move False to FindErr
     End_Procedure
 
 End_Class

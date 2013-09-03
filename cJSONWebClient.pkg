@@ -1,7 +1,7 @@
-// cJSONClient class v1.00:
+// cJSONWebClient class v1.01:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
-Define cJSONCLIENT_INCLUDED for 1
+Define cJSONWEBCLIENT_INCLUDED for 1
 
 #IFNDEF cWEBCLIENT_INCLUDED
 Use cWebClient.pkg
@@ -18,6 +18,7 @@ Use cJSONParser.pkg
 Class cJSONWebClient is a cWebClient
     Procedure Construct_Object
         Forward Send Construct_Object
+        Property String psRawResponse
     End_Procedure
     
     Procedure _PrepareGetRequest
@@ -59,20 +60,37 @@ Class cJSONWebClient is a cWebClient
     {Visibility="Public"}
     Function DownloadJSON String sUrl Returns Handle
         Send _PrepareGetRequest
-        String sJSON
+        String sJSON sResponseContentType
+        
         Handle hJSONDictionary hJSONParser
         Get DownloadString sUrl to sJSON
-        If (piResponseStatus(Self) <> 200) Begin
+        Set psRawResponse to sJSON
+        If (piResponseStatus(Self) <> 200 and Trim(sJSON) = "") Begin
             Function_Return 0
         End
+        
+        Get ResponseContentType to sResponseContentType
+        
+        If (not(Pos("json", Lowercase(sResponseContentType)))) Begin
+            Function_Return 0    
+        End
+        
         Get Create U_cJSONDictionary to hJSONDictionary
         If (_WrapResponseIfNeeded(Self, sJSON, hJSONDictionary)) Begin
             Function_Return hJSONDictionary
         End
+        
         Get Create U_cJSONParser to hJSONParser
         Send Parse of hJSONParser sJSON hJSONDictionary
-        Send Destroy of hJSONParser
-        Function_Return hJSONDictionary
+        If (Found) Begin
+            Send Destroy of hJSONParser
+            Function_Return hJSONDictionary
+        End
+        Else Begin
+           Send Destroy of hJSONParser
+           Send Destroy of hJSONDictionary
+           Function_Return 0 
+        End
     End_Function
     
     {Visibility="Public"}
@@ -80,27 +98,44 @@ Class cJSONWebClient is a cWebClient
         Send _PrepareGetRequest
         String sJSON
         Get DownloadString sUrl to sJSON
+        Set psRawResponse to sJSON
         Function_Return sJSON
     End_Function
     
     {Visibility="Public"}
     Function UploadJSON String sUrl Handle hJSONDictonary Returns Handle
         Send _PreparePostRequest
-        String sJSON sResponse
+        String sJSON sResponse sResponseContentType
         Handle hJSONDictionary hJSONParser
+        
         Get Serialize of hJSONDictonary to sJSON
         Get UploadString sUrl sJSON to sResponse
-        If (piResponseStatus(Self) <> 200) Begin
+        Set psRawResponse to sResponse
+        If (piResponseStatus(Self) <> 200 and Trim(sJSON) = "") Begin
             Function_Return 0
         End
+        
+        Get ResponseContentType to sResponseContentType
+        
+        If (not(Pos("json", Lowercase(sResponseContentType)))) Begin
+            Function_Return 0    
+        End
+        
         Get Create U_cJSONDictionary to hJSONDictionary
         If (_WrapResponseIfNeeded(Self, sResponse, hJSONDictionary)) Begin
             Function_Return hJSONDictionary
         End
         Get Create U_cJSONParser to hJSONParser
-        Send Parse of hJSONParser sJSON hJSONDictionary
-        Send Destroy of hJSONParser
-        Function_Return hJSONDictionary
+        Send Parse of hJSONParser sResponse hJSONDictionary
+        If (Found) Begin
+            Send Destroy of hJSONParser
+            Function_Return hJSONDictionary
+        End
+        Else Begin
+           Send Destroy of hJSONParser
+           Send Destroy of hJSONDictionary
+           Function_Return 0 
+        End
     End_Function
     
     {Visibility="Public"}
@@ -108,6 +143,7 @@ Class cJSONWebClient is a cWebClient
         Send _PreparePostRequest
         String sResponse
         Get UploadString sUrl sJSON to sResponse
+        Set psRawResponse to sResponse
         Function_Return sResponse
     End_Function
 End_Class
