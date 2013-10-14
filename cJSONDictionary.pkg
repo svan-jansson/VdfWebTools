@@ -61,6 +61,12 @@ Class cJSONDictionary is a cHashTable
     End_Function
 
     Procedure _Escape String ByRef s
+        
+        If (s = NULL_ENTRY) Begin
+            Move "" to s
+            Procedure_Return
+        End
+        
         //Escaping according to JSON.org
         Move (Replaces('\',s,'\\'))           to s
         Move (Replaces('/',s,'\/'))           to s
@@ -155,7 +161,7 @@ Class cJSONDictionary is a cHashTable
             Get _Type v to type
             Move saKeys[i] to sKey
             Send _Escape (&sKey)
-            
+
             Case Begin
                 
                 Case (type = _jsond_null) 
