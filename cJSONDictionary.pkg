@@ -227,7 +227,7 @@ Class cJSONDictionary is a cHashTable
         Real ms
         DateTime dt1970
         If (IsNullDateTime(dt) or DateGetYear(dt) < 1970) Begin
-            Set Value sKey to ""
+            Set Value sKey to "/Date(-62135596800000)/"
         End
         Else Begin
             Move (DateSetYear(dt1970, 1970)) to dt1970
