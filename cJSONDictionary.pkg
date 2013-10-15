@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.08:
+// cJSONDictionary class v1.09:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -227,7 +227,7 @@ Class cJSONDictionary is a cHashTable
         Real ms
         DateTime dt1970
         If (IsNullDateTime(dt) or DateGetYear(dt) < 1970) Begin
-            Set Value sKey to "/Date(-62135596800000)/"
+            Set Value sKey to "/Date(0)/"
         End
         Else Begin
             Move (DateSetYear(dt1970, 1970)) to dt1970
