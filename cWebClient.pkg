@@ -1,4 +1,4 @@
-// cWebClient class v1.05:
+// cWebClient class v1.06:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
@@ -213,6 +213,32 @@ Class cWebClient is a cObject
         Function_Return (iStatus <> 0)
     End_Function
 
+    Function _DoPutRequest String sUrl String sData Handle hTransfer Boolean bIsFile Returns Boolean
+        _tcWebClientUri Uri
+        Integer iStatus
+        String sEncoded
+        Send _ClearDataReceived of (phTransfer(Self))
+        Get _URISegments sURL to Uri
+        Send _PrepareRequest Uri hTransfer
+        If (not(bIsFile)) Begin
+            Get _EncodeRequest sData to sData
+        End
+        If (not(pbContentTypeHeaderAdded(Self))) Begin
+            If (piUploadEncoding(Self) = cwcUTF8) Begin
+                Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded; charset=utf-8"
+            End
+            Else Begin
+                Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded"
+            End
+        End
+        Get HttpPutRequest of hTransfer (SFormat("%1%2%3%4", ;
+                                                 Uri.Path, ;
+                                                 Uri.Name, ;
+                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
+                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) sData bIsFile to iStatus
+        Function_Return (iStatus <> 0)
+    End_Function
+
     {Visibility="Public"}
     Function ResponseContentType Returns String
         Function_Return (psDownloadedContentType(phTransfer(Self)))
@@ -283,7 +309,26 @@ Class cWebClient is a cObject
         Get _DecodeResponse sString to sString
         Function_Return sString
     End_Function
-    
+
+    {Visibility="Public"}
+    Function PutString String sUrl String sData Returns String
+        Handle hTransfer
+        Boolean bOk
+        String sString
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Get _DoPutRequest sUrl sData hTransfer False to bOk
+        If (bOk) Begin
+            Get psDownloadedData of hTransfer to sString
+        End
+        Else Begin
+            Move "" to sString
+        End
+        Send _StoreStatus hTransfer
+        Get _DecodeResponse sString to sString
+        Function_Return sString
+    End_Function
+
     {Visibility="Public"}
     Function DownloadFile String sUrl String sFileName Returns Boolean
         Boolean bExists bOk
@@ -318,4 +363,24 @@ Class cWebClient is a cObject
         Get _DecodeResponse sString to sString
         Function_Return sString
     End_Function
+
+    {Visibility="Public"}
+    Function PutFile String sUrl String sFile Returns String
+        Handle hTransfer
+        Boolean bOk
+        String sString
+        Get _ValidateAndFormatURL sUrl to sUrl
+        Get phTransfer to hTransfer
+        Get _DoPutRequest sUrl sFile hTransfer True to bOk
+        If (bOk) Begin
+            Get psDownloadedData of hTransfer to sString
+        End
+        Else Begin
+            Move "" to sString
+        End
+        Send _StoreStatus hTransfer
+        Get _DecodeResponse sString to sString
+        Function_Return sString
+    End_Function
+
 End_Class

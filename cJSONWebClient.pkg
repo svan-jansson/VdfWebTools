@@ -1,4 +1,4 @@
-// cJSONWebClient class v1.01:
+// cJSONWebClient class v1.02:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONWEBCLIENT_INCLUDED for 1
@@ -143,6 +143,51 @@ Class cJSONWebClient is a cWebClient
         Send _PreparePostRequest
         String sResponse
         Get UploadString sUrl sJSON to sResponse
+        Set psRawResponse to sResponse
+        Function_Return sResponse
+    End_Function
+    
+    {Visibility="Public"}
+    Function PutJSON String sUrl Handle hJSONDictonary Returns Handle
+        Send _PreparePostRequest
+        String sJSON sResponse sResponseContentType
+        Handle hJSONDictionary hJSONParser
+        
+        Get Serialize of hJSONDictonary to sJSON
+        Get PutString sUrl sJSON to sResponse
+        Set psRawResponse to sResponse
+        If (piResponseStatus(Self) <> 200 and Trim(sJSON) = "") Begin
+            Function_Return 0
+        End
+        
+        Get ResponseContentType to sResponseContentType
+        
+        If (not(Pos("json", Lowercase(sResponseContentType)))) Begin
+            Function_Return 0    
+        End
+        
+        Get Create U_cJSONDictionary to hJSONDictionary
+        If (_WrapResponseIfNeeded(Self, sResponse, hJSONDictionary)) Begin
+            Function_Return hJSONDictionary
+        End
+        Get Create U_cJSONParser to hJSONParser
+        Send Parse of hJSONParser sResponse hJSONDictionary
+        If (Found) Begin
+            Send Destroy of hJSONParser
+            Function_Return hJSONDictionary
+        End
+        Else Begin
+           Send Destroy of hJSONParser
+           Send Destroy of hJSONDictionary
+           Function_Return 0 
+        End
+    End_Function
+    
+    {Visibility="Public"}
+    Function PutJSONString String sUrl String sJSON Returns String
+        Send _PreparePostRequest
+        String sResponse
+        Get PutString sUrl sJSON to sResponse
         Set psRawResponse to sResponse
         Function_Return sResponse
     End_Function
