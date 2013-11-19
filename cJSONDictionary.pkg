@@ -22,7 +22,6 @@ Define _jsond_array         for "array"
 Define _jsond_object_array  for "arrayofobjects"
 Define _jsond_bool          for "boolean"       
 
-
 #IFNDEF Is$WebApp
 Class _cJSONDictionaryErrorSystem is an ErrorSystem
     Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
@@ -243,7 +242,8 @@ Class cJSONDictionary is a cHashTable
                     
                     Move "[" to sValue
                     For ii from 0 to (SizeOfArray(va)-1)
-                        Get Serialize of va[ii] to sChildValue
+                        If (va[ii] <= 0) Move "{}" to sChildValue
+                        else Get Serialize of va[ii] to sChildValue
                         Append sValue (SFormat('%1%2', sChildValue, If(ii < SizeOfArray(va)-1,',','')))
                     Loop
                     Append sValue "]"
