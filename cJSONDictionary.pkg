@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.09:
+// cJSONDictionary class v1.10:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -12,12 +12,16 @@ Use cRegex.pkg
 #ENDIF
 
 //Data type constants
-Define _jsond_type for Integer
-Define _jsond_null for 0
-Define _jsond_string for 1
-Define _jsond_number for 2
-Define _jsond_object for 4
-Define _jsond_array for 5
+Define _jsond_type for String
+Define _jsond_unspecified   for "unspecified"   
+Define _jsond_null          for "null"          
+Define _jsond_string        for "string"        
+Define _jsond_number        for "number"        
+Define _jsond_object        for "object"        
+Define _jsond_array         for "array"         
+Define _jsond_object_array  for "arrayofobjects"
+Define _jsond_bool          for "boolean"       
+
 
 #IFNDEF Is$WebApp
 Class _cJSONDictionaryErrorSystem is an ErrorSystem
@@ -59,7 +63,15 @@ Class cJSONDictionary is a cHashTable
     Function Is_cJSONDictionary Returns Boolean
         Function_Return True
     End_Function
-
+    
+    Function _ValueKey String sKey Returns String
+        Function_Return (SFormat("__[internal]__[t]*%1", sKey))
+    End_Function
+    
+    Function _IsValueKey String sKey Returns Boolean
+        Function_Return (Pos("__[internal]__[t]",sKey))
+    End_Function
+    
     Procedure _Escape String ByRef s
         
         If (s = NULL_ENTRY) Begin
@@ -128,9 +140,13 @@ Class cJSONDictionary is a cHashTable
 
     End_Function
 
-    Function _Type Variant v  Returns _jsond_type
+    Function _Type String sKey Variant v Returns _jsond_type
         Variant[] va
+        _jsond_type type
         
+        Get TypeForValue sKey to type
+        If (type <> _jsond_unspecified) Function_Return type
+
         Get _ArrayCast v to va
         If (SizeOfArray(va) > 0)                      Function_Return _jsond_array
         If (Is_cJSONDictionary(v))                    Function_Return _jsond_object
@@ -139,7 +155,7 @@ Class cJSONDictionary is a cHashTable
         If (_ValueTypeCheck(Self, v, _jsond_null))    Function_Return _jsond_null
 
     End_Function
-    
+
     Function _JSONNumber String s Returns String
         Integer iDSep ITSep
         Get_Attribute DF_DECIMAL_SEPARATOR to iDSep
@@ -150,6 +166,7 @@ Class cJSONDictionary is a cHashTable
     Procedure _Serialize String[] saKeys String ByRef sJSON
         Integer i ii
         Variant v
+        Boolean b
         Variant[] va
         String sKey sValue sChildValue
         _jsond_type type child_type
@@ -158,7 +175,7 @@ Class cJSONDictionary is a cHashTable
         
         For i from 0 to (SizeOfArray(saKeys)-1)
             Get Value saKeys[i] to v
-            Get _Type v to type
+            Get _Type saKeys[i] v to type
             Move saKeys[i] to sKey
             Send _Escape (&sKey)
 
@@ -167,8 +184,13 @@ Class cJSONDictionary is a cHashTable
                 Case (type = _jsond_null) 
                     Move 'null' to sValue
                 Case Break
-
-                Case (type = _jsond_string) 
+                
+                Case (type = _jsond_bool) 
+                    Move v to b
+                    Move (If(b, "true", "false")) to sValue
+                Case Break
+                
+                Case (type = _jsond_string or type = _jsond_unspecified) 
                     Move v to sValue
                     Send _Escape (&sValue)
                     Move (SFormat('"%1"', sValue)) to sValue
@@ -189,11 +211,15 @@ Class cJSONDictionary is a cHashTable
                     Move "[" to sValue
                     
                     For ii from 0 to (SizeOfArray(va)-1)
-                        Get _Type va[ii] to child_type
+                        Get _Type "" va[ii] to child_type
                         If (child_type = _jsond_null) Begin
                             Append sValue (SFormat('null%1', If(ii < SizeOfArray(va)-1,',','')))
                         End         
-                        Else If (child_type = _jsond_string) Begin
+                        Else If (child_type = _jsond_bool) Begin
+                            Move va[ii] to b
+                            Append sValue (SFormat('%2%1', If(ii < SizeOfArray(va)-1,',',''), (If(b, "true", "false"))))
+                        End
+                        Else If (child_type = _jsond_string or child_type = _jsond_unspecified) Begin
                             Move va[ii] to sChildValue
                             Send _Escape (&sChildValue)
                             Append sValue (SFormat('"%1"%2', sChildValue, If(ii < SizeOfArray(va)-1,',','')))
@@ -209,6 +235,19 @@ Class cJSONDictionary is a cHashTable
                     Loop
                     
                     Append sValue "]"
+                Case Break
+                
+                Case (type = _jsond_object_array) 
+                    
+                    Get _ArrayCast v to va
+                    
+                    Move "[" to sValue
+                    For ii from 0 to (SizeOfArray(va)-1)
+                        Get Serialize of va[ii] to sChildValue
+                        Append sValue (SFormat('%1%2', sChildValue, If(ii < SizeOfArray(va)-1,',','')))
+                    Loop
+                    Append sValue "]"
+                    
                 Case Break
                 
             Case End
@@ -238,7 +277,36 @@ Class cJSONDictionary is a cHashTable
             Set Value sKey to (SFormat("/Date(%1)/", ms)) 
         End
     End_Procedure
-        
+
+    { Visibility=Public }
+    Procedure Set TypedValue String sKey _jsond_type type Variant vValue
+        String sValueKey
+        Forward Set Value sKey to vValue
+        If (type = _jsond_unspecified) Procedure_Return
+        Get _ValueKey sKey to sValueKey
+        Set Value sValueKey to type
+    End_Procedure
+    
+    { Visibility=Public }
+    Function TypeForValue String sKey Returns _jsond_type
+        _jsond_type type
+        Get Value (_ValueKey(Self, sKey)) to type
+        If (not(Found)) Function_Return _jsond_unspecified
+        Function_Return type
+    End_Function
+    
+    Function Keys Returns String[]
+        String[] sa saFiltered
+        Integer i
+        Forward Get Keys to sa
+        For i from 0 to (SizeOfArray(sa)-1)
+            If (not(_IsValueKey(Self, sa[i]))) Begin
+                Move sa[i] to saFiltered[SizeOfArray(saFiltered)]
+            End
+        Loop
+        Function_Return saFiltered
+    End_Function
+    
     { Visibility=Public }
     Function Serialize Returns String
         String sJSON

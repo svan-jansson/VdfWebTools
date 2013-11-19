@@ -1,4 +1,4 @@
-// cJSONParser class v1.10:
+// cJSONParser class v1.11:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -108,13 +108,50 @@ Class cJSONParser is a cObject
         Function_Return isolated   
     End_Function
     
-    Procedure _ParseArray Variant[] ByRef vaParent tRegexMatch[] tokenized Integer iLevel
+    Function _IsBool tRegexMatch val Returns Boolean
+        String sJson
+        String s
+        Get psJSON to sJson
+        If (val.Val = "true" or val.Val = "false") Begin
+            Move (Mid(sJson, 1, val.FirstIndex)) to s
+            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
+                Function_Return True
+            End
+        End
+        Function_Return False
+    End_Function
+    
+    Function _IsNull tRegexMatch val Returns Boolean
+        String sJson
+        Get psJSON to sJson
+        If (val.Val = "null") Begin
+            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
+                Function_Return True
+            End
+        End
+        Function_Return False
+    End_Function
+
+    Function _IsNumeric tRegexMatch val Returns Boolean
+        String sJson
+        Get psJSON to sJson
+        If (Regex_IsMatch(val.Val, "(-)?(\d+)((.|,)\d*)?",True)) Begin
+            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
+                Function_Return True
+            End
+        End
+        Function_Return False
+    End_Function
+
+    Procedure _ParseArray Variant[] ByRef vaParent tRegexMatch[] tokenized Integer iLevel Boolean ByRef bIsObjectArray
         Integer i
         String sKey sValue
         Variant vValue
         Handle h
         tRegexMatch[] isolated
         Variant[] va null
+        Boolean b
+        
         For i from 0 to (SizeOfArray(tokenized)-1)
             
             If (tokenized[i].Val <> "," and tokenized[i].Val <> "}" and tokenized[i].Val <> "]") Begin
@@ -126,12 +163,13 @@ Class cJSONParser is a cObject
                     Get _IsolateObject i tokenized to isolated
                     Send _ParseObject h isolated (iLevel+1)
                     Add (SizeOfArray(isolated)) to i
+                    Move True to bIsObjectArray
                 End
                 
                 //[array]
                 Else If (tokenized[i].Val = "[") Begin
                     Move (_IsolateArray(Self, i, tokenized)) to isolated
-                    Send _ParseArray (&va) isolated (iLevel+1)
+                    Send _ParseArray (&va) isolated (iLevel+1) (b)
                     Add (SizeOfArray(isolated)) to i
                     Move va to vaParent[(SizeOfArray(vaParent))]
                     Move null to va
@@ -161,6 +199,8 @@ Class cJSONParser is a cObject
         Handle h
         Variant[] va null
         tRegexMatch[] isolated
+        _jsond_type type
+        Boolean bIsObjectArray
 
         For i from 0 to (SizeOfArray(tokenized)-1)
 
@@ -175,7 +215,19 @@ Class cJSONParser is a cObject
                 If (_IsMicrosoftDate(Self, vValue)) Begin
                     Get _ParseMicrosoftDate vValue to vValue
                 End
-                Set Value of hParent sKey to vValue
+                If (_IsBool(Self, tokenized[i+1])) Begin
+                   Move _jsond_bool to type 
+                End
+                Else If (_IsNull(Self, tokenized[i+1])) Begin
+                   Move _jsond_null to type 
+                End
+                Else If (_IsNumeric(Self, tokenized[i+1])) Begin
+                   Move _jsond_number to type 
+                End
+                Else Begin
+                    Move _jsond_unspecified to type
+                End
+                Set TypedValue of hParent sKey type to vValue
             End
             
             //"key":{object}
@@ -183,7 +235,7 @@ Class cJSONParser is a cObject
                 Get Create of (phOutDictionary(Self)) U_cJSONDictionary to h
                 Move tokenized[i-1].Val to sKey
                 Send _UnEscape (&sKey)
-                Set Value of hParent sKey to h
+                Set TypedValue of hParent sKey _jsond_object to h
                 Increment iLevel
                 Move (_IsolateObject(Self, i+1, tokenized)) to isolated
                 Add (SizeOfArray(isolated)) to i
@@ -195,9 +247,11 @@ Class cJSONParser is a cObject
                 Move tokenized[i-1].Val to sKey
                 Send _UnEscape (&sKey)
                 Move (_IsolateArray(Self, i+1, tokenized)) to isolated
-                Send _ParseArray (&va) isolated (&iLevel) 
+                Move False to bIsObjectArray
+                Send _ParseArray (&va) isolated (&iLevel) (&bIsObjectArray)
                 Add (SizeOfArray(isolated)) to i
-                Set Value of hParent sKey to va
+                If (bIsObjectArray) Set TypedValue of hParent sKey _jsond_object_array to va
+                Else Set TypedValue of hParent sKey _jsond_array to va
                 Move null to va
             End            
         Loop
