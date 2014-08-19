@@ -1,4 +1,4 @@
-// cJSONParser class v1.12:
+// cJSONParser class v1.13:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -12,20 +12,76 @@ Use cJSONDictionary.pkg
 Use cRegex.pkg
 #ENDIF
 
+Define JSON_TOKEN for Integer
+Define JSON_TOKEN_NONE for 0
+Define JSON_TOKEN_CURLY_OPEN for 1
+Define JSON_TOKEN_CURLY_CLOSE for 2
+Define JSON_TOKEN_SQUARED_OPEN for 3
+Define JSON_TOKEN_SQUARED_CLOSE for 4
+Define JSON_TOKEN_COLON for 5
+Define JSON_TOKEN_COMMA for 6
+Define JSON_TOKEN_STRING for 7
+Define JSON_TOKEN_NUMBER for 8
+Define JSON_TOKEN_TRUE for 9
+Define JSON_TOKEN_FALSE for 10
+Define JSON_TOKEN_NULL for 11
+
+Register_Function _ParseValue UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant
+
 Class cJSONParser is a cObject
     
     Procedure Construct_Object
         Forward Send Construct_Object
-        Property String _psPattern '("(\\.|[^"])*"|\[|\]|,|\d{1,}\.\d{1,}|\{|\}|\:|[a-zA-Z0-9_\.]+)'
-        Property String psJSON         
-        Property Handle phOutDictionary 0
-        Property Boolean pbAutoParseMicrosoftDates True
+        Property UChar[] pucWhitespace
+        Property UChar[] pucNumbers
+        Property String psDecimalSeparator
+        Property _jsond_type pLastType
+        Property Handle phTopObject
+        Property Integer piLevel 0
+        Property Boolean pbAutoParseMicrosoftDates False
+            
+        UChar[] whitespace
+        Move 9 to whitespace[0]
+        Move 10 to whitespace[1]
+        Move 13 to whitespace[2]
+        Move 32 to whitespace[3]
+        Set pucWhitespace to whitespace
+        
+        UChar[] numbers
+        Move (Ascii('0')) to numbers[0]
+        Move (Ascii('1')) to numbers[1]
+        Move (Ascii('2')) to numbers[2]
+        Move (Ascii('3')) to numbers[3]
+        Move (Ascii('4')) to numbers[4]
+        Move (Ascii('5')) to numbers[5]
+        Move (Ascii('6')) to numbers[6]
+        Move (Ascii('7')) to numbers[7]
+        Move (Ascii('8')) to numbers[8]
+        Move (Ascii('9')) to numbers[9]
+        Move (Ascii('+')) to numbers[10]
+        Move (Ascii('-')) to numbers[11]
+        Move (Ascii('.')) to numbers[12]
+        Move (Ascii('e')) to numbers[13]
+        Move (Ascii('E')) to numbers[14]
+        Set pucNumbers to numbers
+        
+        Integer iDecimalSeparator
+        Get_Attribute DF_DECIMAL_SEPARATOR to iDecimalSeparator
+        Set psDecimalSeparator to (Character(iDecimalSeparator))
     End_Procedure
     
     { Visibility=Public }
     Function Is_cJSONParser Returns Boolean
         Function_Return True
     End_Function
+    
+    Procedure _Increment
+        Set piLevel to (piLevel(Self)+1)
+    End_Procedure
+    
+    Procedure _Decrement
+        Set piLevel to (piLevel(Self)-1)
+    End_Procedure
     
     Function _IsMicrosoftDate String s Returns Boolean
         If (not(pbAutoParseMicrosoftDates(Self))) Function_Return False
@@ -57,252 +113,390 @@ Class cJSONParser is a cObject
         Move (DateSetMillisecond(dtRetVal, MS)) to dtRetVal
         Function_Return dtRetVal
     End_Function
-
-    Procedure _UnEscape String ByRef s
-        If (Left(s,1) = '"' and Right(s,1) = '"') Begin
-            Move (Right(s,Length(s)-1)) to s
-            Move (Left(s, Length(s)-1)) to s
-        End
-        //Unescaping according to JSON.org
-        Move (Replaces('\"',s,'"')) to s
-        Move (Replaces('\\',s,'\')) to s
-        Move (Replaces('\/',s,'/')) to s
-        Move (Replaces('\b',s,Character(8)))  to s
-        Move (Replaces('\f',s,Character(12))) to s
-        Move (Replaces('\n',s,Character(10))) to s
-        Move (Replaces('\r',s,Character(13))) to s
-        Move (Replaces('\t',s,Character(9)))  to s
-    End_Procedure
     
-    Procedure _Isolate Integer iObjStart tRegexMatch[] ByRef tokenized tRegexMatch[] ByRef Isolated String sStarting String sEnding
-        Integer i iLevel
-        Boolean bClosed
-
-        For i from iObjStart to (SizeOfArray(tokenized)-1)
-            If (tokenized[i].Val = sStarting) Begin
-                Increment iLevel
-            End
-            
-            If (tokenized[i].Val = sEnding) Begin
-                Decrement iLevel
-                Move (iLevel = 0) to bClosed
-            End
-            
-            If bClosed Break
+    Procedure _EatWhitespace UChar[] ByRef json Integer ByRef idx
+        UChar[] whitespace
+        Get pucWhitespace to whitespace
+        While (idx < SizeOfArray(json))
+            If (SearchArray(json[idx], whitespace) = -1) Break
+            Increment idx 
         Loop
-
-        Move (CopyArray(tokenized, iObjStart+1, i-1)) to isolated
-        
-        Function_Return isolated        
     End_Procedure
     
-    Function _IsolateObject Integer iObjStart tRegexMatch[] tokenized Returns tRegexMatch[]
-        tRegexMatch[] isolated
-        Send _Isolate iObjStart (&tokenized) (&isolated) "{" "}"
-        Function_Return isolated         
-    End_Function
-
-    Function _IsolateArray Integer iObjStart tRegexMatch[] tokenized Returns tRegexMatch[]
-        tRegexMatch[] isolated
-        Send _Isolate iObjStart (&tokenized) (&isolated) "[" "]"
-        Function_Return isolated   
+    Function _GetLastIndexOfNumber UChar[] ByRef json Integer idx Returns Integer
+        UChar[] numbers
+        Get pucNumbers to numbers
+        Integer lastIndex
+        For lastIndex from idx to (SizeOfArray(json)-1)
+            If (SearchArray(json[lastIndex], numbers) = -1) Break
+        Loop
+        Function_Return (lastIndex-1)
     End_Function
     
-    Function _IsBool tRegexMatch val Returns Boolean
-        String sJson
+    Function _NextToken UChar[] ByRef json Integer ByRef idx Returns JSON_TOKEN
+        Send _EatWhitespace (&json) (&idx)
+        If (idx = SizeOfArray(json)) Function_Return JSON_TOKEN_NONE
+        
+        UChar c
+        Move json[idx] to c
+        Increment idx
+        Case Begin
+            Case (c = Ascii('{'))
+                Function_Return JSON_TOKEN_CURLY_OPEN
+                Case Break
+            Case (c = Ascii('}'))
+                Function_Return JSON_TOKEN_CURLY_CLOSE
+            Case Break
+            
+            Case (c = Ascii('['))
+                Function_Return JSON_TOKEN_SQUARED_OPEN
+            Case Break
+            
+            Case (c = Ascii(']'))
+                Function_Return JSON_TOKEN_SQUARED_CLOSE
+            Case Break
+            
+            Case (c = Ascii(','))
+                Function_Return JSON_TOKEN_COMMA
+            Case Break
+            
+            Case (c = Ascii('"'))
+                Function_Return JSON_TOKEN_STRING
+            Case Break
+            
+            Case (c = Ascii('0') or c = Ascii('1') or c = Ascii('2') or c = Ascii('3') or c = Ascii('4') or ;
+                  c = Ascii('5') or c = Ascii('6') or c = Ascii('7') or c = Ascii('8') or c = Ascii('9') or ;
+                  c = Ascii('-'))
+                Function_Return JSON_TOKEN_NUMBER
+            Case Break
+            
+            Case (c = Ascii(':'))
+                Function_Return JSON_TOKEN_COLON
+            Case Break
+        Case End
+        Decrement idx
+        
+        Integer remainingLength
+        Move (SizeOfArray(json) - idx) to remainingLength
+        
+        // false
+        If (remainingLength >= 5) Begin
+            If (json[idx] = Ascii('f') and ;
+                json[idx + 1] = Ascii('a') and ;
+                json[idx + 2] = Ascii('l') and ;
+                json[idx + 3] = Ascii('s') and ;
+                json[idx + 4] = Ascii('e')) Begin
+                    Add 5 to idx
+                    Function_Return JSON_TOKEN_FALSE
+                End
+        End
+        
+        // true
+        If (remainingLength >= 4) Begin
+           If (json[idx] = Ascii('t') and ;
+               json[idx + 1] = Ascii('r') and ;
+               json[idx + 2] = Ascii('u') and ;
+               json[idx + 3] = Ascii('e')) Begin
+                    Add 4 to idx
+                    Function_Return JSON_TOKEN_TRUE 
+               End
+        End
+        
+        // null
+        If (remainingLength >= 4) Begin
+           If (json[idx] = Ascii('n') and ;
+               json[idx + 1] = Ascii('u') and ;
+               json[idx + 2] = Ascii('l') and ;
+               json[idx + 3] = Ascii('l')) Begin
+                    Add 4 to idx
+                    Function_Return JSON_TOKEN_NULL 
+               End
+        End
+        
+        Function_Return JSON_TOKEN_NONE
+    End_Function
+    
+    Function _LookAhead UChar[] ByRef json Integer idx Returns Integer
+        Integer saveIdx
+        Move idx to saveIdx
+        Function_Return (_NextToken(Self, (&json), (&saveIdx)))
+    End_Procedure
+    
+    Function _ParseString UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns String
+        UChar c
         String s
-        Get psJSON to sJson
-        If (val.Val = "true" or val.Val = "false") Begin
-            Move (Mid(sJson, 1, val.FirstIndex)) to s
-            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
-                Function_Return True
-            End
-        End
-        Function_Return False
-    End_Function
-    
-    Function _IsNull tRegexMatch val Returns Boolean
-        String sJson
-        Get psJSON to sJson
-        If (val.Val = "null") Begin
-            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
-                Function_Return True
-            End
-        End
-        Function_Return False
-    End_Function
-
-    Function _IsNumeric tRegexMatch val Returns Boolean
-        String sJson
-        Get psJSON to sJson
-        If (Regex_IsMatch(val.Val, "(-)?(\d+)((.|,)\d*)?",True)) Begin
-            If (Mid(sJson, 1, val.FirstIndex) <> '"') Begin
-                Function_Return True
-            End
-        End
-        Function_Return False
-    End_Function
-
-    Procedure _ParseArray Variant[] ByRef vaParent tRegexMatch[] tokenized Integer iLevel Boolean ByRef bIsObjectArray
-        Integer i
-        String sKey sValue
-        Variant vValue
-        Handle h
-        tRegexMatch[] isolated
-        Variant[] va null
-        Boolean b
         
-        For i from 0 to (SizeOfArray(tokenized)-1)
+        Send _EatWhitespace (&json) (&idx)
+        
+        // "
+        Increment idx
+        Move json[idx] to c
+        Boolean complete
+        
+        Move "" to s
+        
+        While (not(complete))
+            If (idx = SizeOfArray(json)) Break
+
+            If (c = Ascii('"')) Begin
+                Move True to complete
+            End
+            If (complete) Break
             
-            If (tokenized[i].Val <> "," and tokenized[i].Val <> "}" and tokenized[i].Val <> "]") Begin
-            
-                //{object}
-                If (tokenized[i].Val = "{") Begin
-                    Get Create of (phOutDictionary(Self)) U_cJSONDictionary to h
-                    Move h to vaParent[(SizeOfArray(vaParent))]
-                    Get _IsolateObject i tokenized to isolated
-                    Send _ParseObject h isolated (iLevel+1)
-                    Add (SizeOfArray(isolated)) to i
-                    Move True to bIsObjectArray
-                End
+            If (c = Ascii('\')) Begin
                 
-                //[array]
-                Else If (tokenized[i].Val = "[") Begin
-                    Move (_IsolateArray(Self, i, tokenized)) to isolated
-                    Send _ParseArray (&va) isolated (iLevel+1) (b)
-                    Add (SizeOfArray(isolated)) to i
-                    Move va to vaParent[(SizeOfArray(vaParent))]
-                    Move null to va
-                End
+                If (idx = SizeOfArray(json)) Break
                 
-                //value
-                Else Begin
-                    Move tokenized[i].Val to vValue
-                    Move vValue to sValue
-                    Send _UnEscape (&sValue)
-                    If (vValue <> sValue) Move sValue to vValue
-                    If (_IsMicrosoftDate(Self, vValue)) Begin
-                        Get _ParseMicrosoftDate vValue to vValue
-                    End
-                    Move vValue to vaParent[(SizeOfArray(vaParent))]
-                End      
-            
+                Increment idx
+                Move json[idx] to c
+
+                If (c = Ascii('"')) Append s '"'
+                Else If (c = Ascii('\')) Append s '\'
+                Else If (c = Ascii('/')) Append s '/'
+                Else If (c = Ascii('b')) Append s (Character(8))
+                Else If (c = Ascii('f')) Append s (Character(12))
+                Else If (c = Ascii('n')) Append s (Character(10))
+                Else If (c = Ascii('r')) Append s (Character(13))
+                Else If (c = Ascii('t')) Append s (Character(9))
+                
+            End
+            Else Begin
+                Append s (Character(json[idx]))
             End
             
+            Increment idx
+            Move json[idx] to c
         Loop
-    End_Procedure
-    
-    Procedure _ParseObject Handle hParent tRegexMatch[] tokenized Integer ByRef iLevel
-        Integer i ii
-        String sKey sValue sText
-        Variant vValue
-        Handle h
-        Variant[] va null
-        tRegexMatch[] isolated
-        _jsond_type type
-        Boolean bIsObjectArray
-
-        For i from 0 to (SizeOfArray(tokenized)-1)
-
-            //"key":"value"
-            If (tokenized[i].Val = ":" and tokenized[i+1].Val <> "{" and tokenized[i+1].Val <> "[") Begin
-                Move tokenized[i-1].Val to sKey
-                Move tokenized[i+1].Val to vValue
-                Move vValue to sValue
-                Send _UnEscape (&sKey)
-                Send _UnEscape (&sValue)
-                If (vValue <> sValue) Move sValue to vValue
-                If (_IsMicrosoftDate(Self, vValue)) Begin
-                    Get _ParseMicrosoftDate vValue to vValue
-                End
-                If (_IsBool(Self, tokenized[i+1])) Begin
-                   Move _jsond_bool to type 
-                End
-                Else If (_IsNull(Self, tokenized[i+1])) Begin
-                   Move _jsond_null to type 
-                End
-                Else If (_IsNumeric(Self, tokenized[i+1])) Begin
-                   Move _jsond_number to type 
-                End
-                Else Begin
-                    Move _jsond_unspecified to type
-                End
-                Set TypedValue of hParent sKey type to vValue
-            End
-            
-            //"key":{object}
-            Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "{") Begin
-                Get Create of (phOutDictionary(Self)) U_cJSONDictionary to h
-                Move tokenized[i-1].Val to sKey
-                Send _UnEscape (&sKey)
-                Set TypedValue of hParent sKey _jsond_object to h
-                Increment iLevel
-                Move (_IsolateObject(Self, i+1, tokenized)) to isolated
-                Add (SizeOfArray(isolated)) to i
-                Send _ParseObject h isolated (&iLevel)    
-            End
-            
-            //"key":[array]
-            Else If (tokenized[i].Val = ":" and tokenized[i+1].Val = "[") Begin
-                Move tokenized[i-1].Val to sKey
-                Send _UnEscape (&sKey)
-                Move (_IsolateArray(Self, i+1, tokenized)) to isolated
-                Move False to bIsObjectArray
-                Send _ParseArray (&va) isolated (&iLevel) (&bIsObjectArray)
-                Add (SizeOfArray(isolated)) to i
-                If (bIsObjectArray) Set TypedValue of hParent sKey _jsond_object_array to va
-                Else Set TypedValue of hParent sKey _jsond_array to va
-                Move null to va
-            End            
-        Loop
-
-    End_Procedure
-    
-    Function _IsValidJSON String sJSON Returns Boolean
-        Trim sJSON to sJSON
-        If (Left(sJSON,1) <> "{" and Left(sJSON,1) <> "[") Begin
-            Function_Return False
+        
+        Increment idx
+        
+        If (not(complete)) Begin
+            Move False to success
+            Function_Return NULL_ENTRY
         End
-        Else If (Right(sJSON,1) <> "}" and Right(sJSON,1) <> "]") Begin
-            Function_Return False
+        
+        If (_IsMicrosoftDate(Self, s)) Begin
+            Get _ParseMicrosoftDate s to s
         End
-        Function_Return True
+        
+        Function_Return s
     End_Function
     
-    Function _IsObject String sJSON Returns Handle
-        Function_Return (Left(sJSON,1) = "{")
+    Function _ParseNumber UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Number
+        Integer lastIndex i
+        String sNumber
+        Number n
+        Send _EatWhitespace (&json) (&idx)
+        
+        Move "" to sNumber
+        Get _GetLastIndexOfNumber (&json) idx to lastIndex
+        For i from idx to lastIndex
+            Append sNumber (Character(json[i]))
+        Loop
+        Move (Replace(".", sNumber, psDecimalSeparator(Self))) to n
+        Move (lastIndex+1) to idx
+        Function_Return n
     End_Function
+    
+    Function _ParseObject UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Handle
+        JSON_TOKEN token
+        Handle table
+        String name
+        Variant value
+        
+        If (piLevel(Self) = 1) Move (phTopObject(Self)) to table
+        Else Get Create of (phTopObject(Self)) U_cJSONDictionary to table
+        
+        Boolean done
+        Move (_NextToken(Self, (&json), (&idx))) to token
+        While (not(done))
+            Move (_LookAhead(Self, (&json), (&idx))) to token
+            If (token = JSON_TOKEN_NONE) Begin
+                Send Destroy of table
+                Move False to success
+                Function_Return 0        
+            End
+            Else If (token = JSON_TOKEN_COMMA) Begin
+                Move (_NextToken(Self, (&json), (&idx))) to token
+            End
+            Else If (token = JSON_TOKEN_CURLY_CLOSE) Begin
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                Set pLastType to _jsond_object
+                Send _Decrement
+                Function_Return table
+            End
+            Else Begin
+                
+                // name
+                Move (_ParseString(Self, (&json), (&idx), (&success))) to name
+                If (not(success)) Begin
+                    Send Destroy of table
+                    Move False to success
+                    Function_Return 0  
+                End
+                
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                
+                // :
+                If (token <> JSON_TOKEN_COLON) Begin
+                    Send Destroy of table
+                    Move False to success
+                    Function_Return 0 
+                End
+                
+                // value
+                Get _ParseValue (&json) (&idx) (&success) to value
+                If (not(success)) Begin
+                    Send Destroy of table
+                    Move False to success
+                    Function_Return 0  
+                End
+                
+                Set TypedValue of table name (pLastType(Self)) to value
+                
+            End
+        Loop
+        
+        Set pLastType to _jsond_object
+        Function_Return table
+    End_Function
+
+    Function _ParseArray UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant[]
+        Variant[] nArray arrayNull
+        Boolean done
+        JSON_TOKEN token
+        Variant value
+        _jsond_type lastType
+        
+        Move _jsond_array to lastType
+        Move (_NextToken(Self, (&json), (&idx))) to token
+        While (not(done))
+            Move (_LookAhead(Self, (&json), (&idx))) to token
+            If (token = JSON_TOKEN_NONE) Begin
+                Move False to success
+                Function_Return arrayNull      
+            End
+            Else If (token = JSON_TOKEN_COMMA) Begin
+                Move (_NextToken(Self, (&json), (&idx))) to token
+            End
+            Else If (token = JSON_TOKEN_SQUARED_CLOSE) Begin
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                Set pLastType to lastType
+                Send _Decrement
+                Function_Return nArray
+            End
+            Else Begin
+                Move (_ParseValue(Self, (&json), (&idx), (&success))) to value
+                If (pLastType(Self) = _jsond_object) Begin
+                    Move _jsond_object_array to lastType
+                End
+                If (not(success)) Begin
+                    Move False to success
+                    Function_Return arrayNull   
+                End
+                Move value to nArray[SizeOfArray(nArray)]
+            End
+        Loop
+        Set pLastType to lastType
+        Function_Return nArray
+    End_Function
+
+    Function _ParseValue UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant
+        Integer lookAhead
+        JSON_TOKEN token
+        Get _LookAhead (&json) idx to lookAhead
+        
+        Case Begin
+            
+            Case (lookAhead = JSON_TOKEN_STRING)
+                Set pLastType to _jsond_string
+                Function_Return (_ParseString(Self, (&json), (&idx), (&success)))
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_NUMBER)
+                Set pLastType to _jsond_number
+                Function_Return (_ParseNumber(Self, (&json), (&idx), (&success)))
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_CURLY_OPEN)
+                Set pLastType to _jsond_object
+                Send _Increment
+                Function_Return (_ParseObject(Self, (&json), (&idx), (&success)))
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_SQUARED_OPEN)
+                Set pLastType to _jsond_array
+                Send _Increment
+                Function_Return (_ParseArray(Self, (&json), (&idx), (&success)))
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_TRUE)
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                Set pLastType to _jsond_bool
+                Function_Return True
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_FALSE)
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                Set pLastType to _jsond_bool
+                Function_Return False
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_NULL)
+                Move (_NextToken(Self, (&json), (&idx))) to token
+                Set pLastType to _jsond_null
+                Function_Return NULL_ENTRY
+            Case Break
+            
+            Case (lookAhead = JSON_TOKEN_NONE)
+            Case Break
+            
+        Case End
+        
+        Move False to success
+        
+        Function_Return NULL_ENTRY
+    End_Procedure
+
+    Procedure _ToCharArray String ByRef s UChar[] ByRef ca
+        Address aStr
+        Move (ResizeArray(ca,Length(s))) to ca
+        Move (AddressOf(ca)) to aStr
+        Move s to aStr
+    End_Procedure
     
     { Visibility=Public }
-    Procedure Parse String sJSON Handle Out_hJSONDictionary
-        tRegexMatch[] tokenized
+    Procedure Parse String sJson Handle Out_hJSONDictionary
+        Variant v
         Variant[] va
-        Boolean b
+        UChar[] json
+        Integer idx
+        Boolean success
+        Boolean bIsObject
         
-        If (not(_IsValidJSON(Self, sJSON))) Begin
+        Set phTopObject to Out_hJSONDictionary
+        
+        Move True to success
+        Send _ToCharArray (&sJson) (&json)
+        Get _ParseValue (&json) (&idx) (&success) to v
+        If (not(success)) Begin
             Move False to Found
             Move True to FindErr
             Procedure_Return
         End
         
-        Set phOutDictionary to Out_hJSONDictionary
+        Send Ignore_Error of Error_Object_Id 4381
+        Move False to Err
+        Move v to va
+        Move Err to bIsObject
+        Send Trap_Error of Error_Object_Id 4381
         
-        Set psJSON to sJSON
-
-        Get Regex_Match sJSON (_psPattern(Self)) True to tokenized
-
-        Integer iLevel
-        Move 0 to iLevel
-        If (_IsObject(Self, sJSON)) Begin
-            Send _ParseObject Out_hJSONDictionary (_IsolateObject(Self, 0, tokenized)) (&iLevel)
-        End
-        Else Begin
-            Send _ParseArray (&va) (_IsolateArray(Self, 0, tokenized)) (&iLevel) (&b)
+        If (not(bIsObject)) Begin
             Set Value of Out_hJSONDictionary "_array" to va
         End
         
         Move True to Found
         Move False to FindErr
-    End_Procedure
+    End_Procedure    
 
 End_Class
