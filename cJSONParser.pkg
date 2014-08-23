@@ -1,4 +1,4 @@
-// cJSONParser class v1.13:
+// cJSONParser class v1.14:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -27,6 +27,7 @@ Define JSON_TOKEN_FALSE for 10
 Define JSON_TOKEN_NULL for 11
 
 Register_Function _ParseValue UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant
+Register_Procedure Trap_Error Integer Error#
 
 Class cJSONParser is a cObject
     
@@ -48,21 +49,21 @@ Class cJSONParser is a cObject
         Set pucWhitespace to whitespace
         
         UChar[] numbers
-        Move (Ascii('0')) to numbers[0]
-        Move (Ascii('1')) to numbers[1]
-        Move (Ascii('2')) to numbers[2]
-        Move (Ascii('3')) to numbers[3]
-        Move (Ascii('4')) to numbers[4]
-        Move (Ascii('5')) to numbers[5]
-        Move (Ascii('6')) to numbers[6]
-        Move (Ascii('7')) to numbers[7]
-        Move (Ascii('8')) to numbers[8]
-        Move (Ascii('9')) to numbers[9]
-        Move (Ascii('+')) to numbers[10]
-        Move (Ascii('-')) to numbers[11]
-        Move (Ascii('.')) to numbers[12]
-        Move (Ascii('e')) to numbers[13]
-        Move (Ascii('E')) to numbers[14]
+        Move 48  to numbers[0]   // Ascii('0')
+        Move 49  to numbers[1]   // Ascii('1')
+        Move 50  to numbers[2]   // Ascii('2')
+        Move 51  to numbers[3]   // Ascii('3')
+        Move 52  to numbers[4]   // Ascii('4')
+        Move 53  to numbers[5]   // Ascii('5')
+        Move 54  to numbers[6]   // Ascii('6')
+        Move 55  to numbers[7]   // Ascii('7')
+        Move 56  to numbers[8]   // Ascii('8')
+        Move 57  to numbers[9]   // Ascii('9')
+        Move 43  to numbers[10]  // Ascii('+')
+        Move 45  to numbers[11]  // Ascii('-')
+        Move 46  to numbers[12]  // Ascii('.')
+        Move 101 to numbers[13]  // Ascii('e')
+        Move 69  to numbers[14]  // Ascii('E')
         Set pucNumbers to numbers
         
         Integer iDecimalSeparator
@@ -116,8 +117,10 @@ Class cJSONParser is a cObject
     
     Procedure _EatWhitespace UChar[] ByRef json Integer ByRef idx
         UChar[] whitespace
+        Integer iLen
         Get pucWhitespace to whitespace
-        While (idx < SizeOfArray(json))
+        Move (SizeOfArray(json)) to iLen
+        While (idx < iLen)
             If (SearchArray(json[idx], whitespace) = -1) Break
             Increment idx 
         Loop
@@ -125,9 +128,11 @@ Class cJSONParser is a cObject
     
     Function _GetLastIndexOfNumber UChar[] ByRef json Integer idx Returns Integer
         UChar[] numbers
-        Get pucNumbers to numbers
+        Integer iLen
         Integer lastIndex
-        For lastIndex from idx to (SizeOfArray(json)-1)
+        Move (SizeOfArray(json)-1) to iLen
+        Get pucNumbers to numbers
+        For lastIndex from idx to iLen 
             If (SearchArray(json[lastIndex], numbers) = -1) Break
         Loop
         Function_Return (lastIndex-1)
@@ -141,36 +146,34 @@ Class cJSONParser is a cObject
         Move json[idx] to c
         Increment idx
         Case Begin
-            Case (c = Ascii('{'))
+            Case (c = 123) // Ascii('{')
                 Function_Return JSON_TOKEN_CURLY_OPEN
                 Case Break
-            Case (c = Ascii('}'))
+            Case (c = 125) // Ascii('}')
                 Function_Return JSON_TOKEN_CURLY_CLOSE
             Case Break
             
-            Case (c = Ascii('['))
+            Case (c = 91) // Ascii('[')
                 Function_Return JSON_TOKEN_SQUARED_OPEN
             Case Break
             
-            Case (c = Ascii(']'))
+            Case (c = 93) // Ascii(']')
                 Function_Return JSON_TOKEN_SQUARED_CLOSE
             Case Break
             
-            Case (c = Ascii(','))
+            Case (c = 44) // Ascii(',')
                 Function_Return JSON_TOKEN_COMMA
             Case Break
             
-            Case (c = Ascii('"'))
+            Case (c = 34) // Ascii('"')
                 Function_Return JSON_TOKEN_STRING
             Case Break
             
-            Case (c = Ascii('0') or c = Ascii('1') or c = Ascii('2') or c = Ascii('3') or c = Ascii('4') or ;
-                  c = Ascii('5') or c = Ascii('6') or c = Ascii('7') or c = Ascii('8') or c = Ascii('9') or ;
-                  c = Ascii('-'))
+            Case ((c >= 48 and c <= 57) or c = 45) // Ascii('0') -> Ascii('9') || Ascii('-') 
                 Function_Return JSON_TOKEN_NUMBER
             Case Break
             
-            Case (c = Ascii(':'))
+            Case (c = 58) // Ascii(':')
                 Function_Return JSON_TOKEN_COLON
             Case Break
         Case End
@@ -181,11 +184,12 @@ Class cJSONParser is a cObject
         
         // false
         If (remainingLength >= 5) Begin
-            If (json[idx] = Ascii('f') and ;
-                json[idx + 1] = Ascii('a') and ;
-                json[idx + 2] = Ascii('l') and ;
-                json[idx + 3] = Ascii('s') and ;
-                json[idx + 4] = Ascii('e')) Begin
+            If (json[idx]     = 102 and ; // Ascii('f')
+                json[idx + 1] = 97  and ; // Ascii('a')
+                json[idx + 2] = 108 and ; // Ascii('l')
+                json[idx + 3] = 115 and ; // Ascii('s')
+                json[idx + 4] = 101)    ; // Ascii('e')
+                Begin
                     Add 5 to idx
                     Function_Return JSON_TOKEN_FALSE
                 End
@@ -193,10 +197,11 @@ Class cJSONParser is a cObject
         
         // true
         If (remainingLength >= 4) Begin
-           If (json[idx] = Ascii('t') and ;
-               json[idx + 1] = Ascii('r') and ;
-               json[idx + 2] = Ascii('u') and ;
-               json[idx + 3] = Ascii('e')) Begin
+           If (json[idx]     = 116 and ; // Ascii('t')
+               json[idx + 1] = 114 and ; // Ascii('r')
+               json[idx + 2] = 117 and ; // Ascii('u')
+               json[idx + 3] = 101)    ; // Ascii('e')
+               Begin
                     Add 4 to idx
                     Function_Return JSON_TOKEN_TRUE 
                End
@@ -204,10 +209,11 @@ Class cJSONParser is a cObject
         
         // null
         If (remainingLength >= 4) Begin
-           If (json[idx] = Ascii('n') and ;
-               json[idx + 1] = Ascii('u') and ;
-               json[idx + 2] = Ascii('l') and ;
-               json[idx + 3] = Ascii('l')) Begin
+           If (json[idx]     = 110 and ; // Ascii('n')
+               json[idx + 1] = 117 and ; // Ascii('u')
+               json[idx + 2] = 108 and ; // Ascii('l')
+               json[idx + 3] = 108)    ; // Ascii('l')
+               Begin
                     Add 4 to idx
                     Function_Return JSON_TOKEN_NULL 
                End
@@ -238,26 +244,26 @@ Class cJSONParser is a cObject
         While (not(complete))
             If (idx = SizeOfArray(json)) Break
 
-            If (c = Ascii('"')) Begin
+            If (c = 34) Begin // Ascii('"')
                 Move True to complete
             End
             If (complete) Break
             
-            If (c = Ascii('\')) Begin
+            If (c = 92) Begin // Ascii('\')
                 
                 If (idx = SizeOfArray(json)) Break
                 
                 Increment idx
                 Move json[idx] to c
 
-                If (c = Ascii('"')) Append s '"'
-                Else If (c = Ascii('\')) Append s '\'
-                Else If (c = Ascii('/')) Append s '/'
-                Else If (c = Ascii('b')) Append s (Character(8))
-                Else If (c = Ascii('f')) Append s (Character(12))
-                Else If (c = Ascii('n')) Append s (Character(10))
-                Else If (c = Ascii('r')) Append s (Character(13))
-                Else If (c = Ascii('t')) Append s (Character(9))
+                If (c = 34)       Append s '"'               // Ascii('"')
+                Else If (c = 92)  Append s '\'               // Ascii('\')
+                Else If (c = 47)  Append s '/'               // Ascii('/')
+                Else If (c = 98)  Append s (Character(8))    // Ascii('b')
+                Else If (c = 102) Append s (Character(12))   // Ascii('f')
+                Else If (c = 110) Append s (Character(10))   // Ascii('n')
+                Else If (c = 114) Append s (Character(13))   // Ascii('r')
+                Else If (c = 116) Append s (Character(9))    // Ascii('t')
                 
             End
             Else Begin
@@ -482,6 +488,7 @@ Class cJSONParser is a cObject
         If (not(success)) Begin
             Move False to Found
             Move True to FindErr
+            Move True to Err
             Procedure_Return
         End
         
@@ -497,6 +504,7 @@ Class cJSONParser is a cObject
         
         Move True to Found
         Move False to FindErr
+        Move False to Err
     End_Procedure    
 
 End_Class
