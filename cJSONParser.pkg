@@ -1,4 +1,4 @@
-// cJSONParser class v1.15:
+// cJSONParser class v1.16:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -291,8 +291,7 @@ Class cJSONParser is a cObject
     Function _ParseNumber UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant
         Integer lastIndex i
         String sNumber
-        Real r
-        Number n
+        Variant v
         Send _EatWhitespace (&json) (&idx)
         
         Move "" to sNumber
@@ -300,18 +299,9 @@ Class cJSONParser is a cObject
         For i from idx to lastIndex
             Append sNumber (Character(json[i]))
         Loop
-        
         Move (lastIndex+1) to idx
-        
-        Send Ignore_Error of Error_Object_Id 17
-        Move False to Err
-        Move (Replace(".", sNumber, psDecimalSeparator(Self))) to n
-        Send Trap_Error of Error_Object_Id 17
-        If (Err) Begin
-            Move (Replace(".", sNumber, psDecimalSeparator(Self))) to r
-            Function_Return r
-        End
-        Function_Return n
+        Move (Replace(".", sNumber, psDecimalSeparator(Self))) to v
+        Function_Return v
     End_Function
     
     Function _ParseObject UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Handle
