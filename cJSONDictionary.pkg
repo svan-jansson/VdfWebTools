@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.10:
+// cJSONDictionary class v1.11:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -293,6 +293,48 @@ Class cJSONDictionary is a cHashTable
         Get Value (_ValueKey(Self, sKey)) to type
         If (not(Found)) Function_Return _jsond_unspecified
         Function_Return type
+    End_Function
+    
+    { Visibility=Public }
+    Function ValueAtPath String sPath Returns Variant
+        tRegexMatch[] keys
+        tRegexMatch key
+        Integer i iMax iIdx
+        Variant v
+        Variant[] va
+        String sArrKey
+        
+        Get Regex_Match sPath "[^\.]+(?=(\.|$))" True to keys
+        Move (Self) to v
+        Move (SizeOfArray(keys)-1) to iMax
+        For i from 0 to iMax
+            Send Ignore_Error of Error_Object_Id DFERR_BAD_SYMBOL_EXPRESSION
+            Send Ignore_Error of Error_Object_Id DFERR_ILLEGAL_CONVERSION
+            Send Ignore_Error of Error_Object_Id DFERR_ARRAY_INDEX_OUT_OF_BOUNDS
+            Move False to Err
+            Move keys[i] to key
+            If (Regex_IsMatch(key.Val, "\[\d+\]")) Begin
+                Move (Regex_Replace(key.Val, "", "\[\d+\]", True)) to sArrKey
+                Move (Regex_Replace(key.Val, "", ".*\[|\]", True)) to iIdx
+                Get Value of v sArrKey to v
+                If (not(Found)) Function_Return NULL_ENTRY
+                Move v to va
+                Move va[iIdx] to v
+            End
+            Else Begin
+                Get Value of v key.Val to v
+                If (not(Found)) Function_Return NULL_ENTRY
+            End
+            Send Trap_Error of Error_Object_Id DFERR_BAD_SYMBOL_EXPRESSION
+            Send Trap_Error of Error_Object_Id DFERR_ILLEGAL_CONVERSION
+            Send Trap_Error of Error_Object_Id DFERR_ARRAY_INDEX_OUT_OF_BOUNDS
+            If (Err) Begin
+                Move False to Found
+                Function_Return NULL_ENTRY
+            End
+        Loop
+        Move True to Found
+        Function_Return v
     End_Function
     
     Function Keys Returns String[]
