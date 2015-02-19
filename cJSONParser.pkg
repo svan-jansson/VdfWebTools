@@ -1,4 +1,4 @@
-// cJSONParser class v1.16:
+// cJSONParser class v1.18:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 
@@ -11,6 +11,8 @@ Use cJSONDictionary.pkg
 #IFNDEF cREGEX_INCLUDED
 Use cRegex.pkg
 #ENDIF
+
+Use CharTranslate.pkg
 
 Define JSON_TOKEN for Integer
 Define JSON_TOKEN_NONE for 0
@@ -27,7 +29,6 @@ Define JSON_TOKEN_FALSE for 10
 Define JSON_TOKEN_NULL for 11
 
 Register_Function _ParseValue UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns Variant
-Register_Procedure Trap_Error Integer Error#
 
 Class cJSONParser is a cObject
     
@@ -40,6 +41,7 @@ Class cJSONParser is a cObject
         Property Handle phTopObject
         Property Integer piLevel 0
         Property Boolean pbAutoParseMicrosoftDates False
+        Property Boolean pbAutoParseUnicodeTokens True
             
         UChar[] whitespace
         Move 9 to whitespace[0]
@@ -228,6 +230,72 @@ Class cJSONParser is a cObject
         Function_Return (_NextToken(Self, (&json), (&saveIdx)))
     End_Procedure
     
+    Function _AssertUnicodeToken UChar[] ByRef json Integer ByRef idx Boolean ByRef bOk Returns Boolean
+        Integer i c
+        For i from 1 to 4
+            Move json[idx + i] to c
+            Move ((c > 47 and c < 58) or ;
+                (c > 64 and c < 71) or ;
+                (c > 96 and c < 103)) to bOk
+            If (not(bOk)) Break
+        Loop
+        Function_Return bOk
+    End_Procedure
+    
+    Procedure _ParseUnicodeToken UChar[] ByRef json Integer ByRef idx String ByRef str
+        String sUtf8 sOem sVdfHexToken
+        Address aOem
+        Integer iVoid
+        Integer c iChars
+        Boolean bOk
+        
+        Get pbAutoParseUnicodeTokens to bOk
+        If (bOk and _AssertUnicodeToken(Self, &json, &idx, &bOk)) Begin
+            Move ("|CI$" + Character(json[idx + 1]) + Character(json[idx + 2]) + Character(json[idx + 3]) + Character(json[idx + 4])) to sVdfHexToken
+            Move (Integer(sVdfHexToken)) to c
+            ZeroString 0 to sUtf8
+            If (c < 128) Begin 
+                Append sUtf8 (Character(c))
+            End
+            Else If (c < 2048) Begin
+                Append sUtf8 (Character(192 + (c/64)))
+                Append sUtf8 (Character(128 + (Mod(c, 64))))
+            End
+            Else If ((c - 55296) < 2048) Begin // Not mapped in CP850
+                Move False to bOk
+            End
+            Else If (c < 65536) Begin
+                Append sUtf8 (Character(224 + (c/4096)))
+                Append sUtf8 (Character(128 + (Mod(c/64, 64)))) 
+                Append sUtf8 (Character(128 + (Mod(c, 64)))) 
+            End
+            Else If (c < 1114112) Begin
+                Append sUtf8 (Character(240 + (c/262144)))
+                Append sUtf8 (Character(128 + (Mod(c/4096, 64)))) 
+                Append sUtf8 (Character(128 + (Mod(c/64, 64)))) 
+                Append sUtf8 (Character(128 + (Mod(c, 64)))) 
+            End
+            Else Begin
+                Move False to bOk
+            End
+            
+            If (bOk) Begin
+                Move (Utf8ToOemBuffer(AddressOf(sUtf8), CStringLength(sUtf8))) to aOem
+                Move aOem to sOem
+                Move (Free(aOem)) to iVoid
+                If (c <> 63 and sOem = "?") Move False to bOk
+            End
+        End
+        
+        If (bOk) Begin
+            Append str sOem
+        End
+        Else Begin
+            Append str ("\u" + Character(json[idx + 1]) + Character(json[idx + 2]) + Character(json[idx + 3]) + Character(json[idx + 4]))
+        End
+        Add 4 to idx
+    End_Procedure
+    
     Function _ParseString UChar[] ByRef json Integer ByRef idx Boolean ByRef success Returns String
         UChar c
         String s
@@ -264,6 +332,7 @@ Class cJSONParser is a cObject
                 Else If (c = 110) Append s (Character(10))   // Ascii('n')
                 Else If (c = 114) Append s (Character(13))   // Ascii('r')
                 Else If (c = 116) Append s (Character(9))    // Ascii('t')
+                Else If (c = 117) Send _ParseUnicodeToken (&json) (&idx) (&s) // Unicode token \u{4 hex digits}
                 
             End
             Else Begin
@@ -478,7 +547,7 @@ Class cJSONParser is a cObject
         UChar[] json
         Integer idx
         Boolean success
-        Boolean bIsObject
+        Boolean bIsArray
         
         Set phTopObject to Out_hJSONDictionary
         
@@ -492,13 +561,9 @@ Class cJSONParser is a cObject
             Procedure_Return
         End
         
-        Send Ignore_Error of Error_Object_Id 4381
-        Move False to Err
-        Move v to va
-        Move Err to bIsObject
-        Send Trap_Error of Error_Object_Id 4381
-        
-        If (not(bIsObject)) Begin
+        Move (_NextToken(Self, &json, 0) = JSON_TOKEN_SQUARED_OPEN) to bIsArray
+        If (bIsArray) Begin
+            Move v to va
             Set Value of Out_hJSONDictionary "_array" to va
         End
         

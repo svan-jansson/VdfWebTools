@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.11:
+// cJSONDictionary class v1.12:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -80,6 +80,7 @@ Class cJSONDictionary is a cHashTable
         
         //Escaping according to JSON.org
         Move (Replaces('\',s,'\\'))           to s
+        Move (Replaces('\\u',s,'\u'))         to s
         Move (Replaces('/',s,'\/'))           to s
         Move (Replaces('"',s,'\"'))           to s                
         Move (Replaces(Character(8),s,'\b'))  to s
