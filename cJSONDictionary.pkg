@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.12:
+// cJSONDictionary class v1.13:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -23,12 +23,18 @@ Define _jsond_object_array  for "arrayofobjects"
 Define _jsond_bool          for "boolean"       
 
 #IFNDEF Is$WebApp
+#IFNDEF ErrorSystem
+    Use Dferror.pkg
+#ENDIF
 Class _cJSONDictionaryErrorSystem is an ErrorSystem
     Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
         //Ignore all errors
     End_Procedure
 End_Class
 #ELSE
+#IFNDEF cWebAppError
+    Use cWebAppError.pkg
+#ENDIF
 Class _cJSONDictionaryErrorSystem is an cWebAppError
     Procedure Error_Report Integer ErrNum Integer Err_Line String ErrMsg
         //Ignore all errors
