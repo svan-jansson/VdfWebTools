@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.13:
+// cJSONDictionary class v1.14:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -77,23 +77,38 @@ Class cJSONDictionary is a cHashTable
         Function_Return (Pos("__[internal]__[t]",sKey))
     End_Function
     
+    Function _IntToHex Integer iVal Returns String
+        Integer iRest
+        String sVal sChar sBase
+        Move "0123456789ABCDEF" to sBase
+        Repeat
+            Move (Mod(iVal,16)) to iRest
+            Move (mid(sBase,1,iRest+1)) to sChar
+            Move (sChar+sVal) to sVal
+            Move (iVal/16) to iVal
+        Until (iVal=0)
+        Function_Return sVal
+    End_Function
+    
     Procedure _Escape String ByRef s
+        Integer i
         
         If (s = NULL_ENTRY) Begin
             Move "" to s
             Procedure_Return
         End
-        
-        //Escaping according to JSON.org
         Move (Replaces('\',s,'\\'))           to s
         Move (Replaces('\\u',s,'\u'))         to s
         Move (Replaces('/',s,'\/'))           to s
-        Move (Replaces('"',s,'\"'))           to s                
-        Move (Replaces(Character(8),s,'\b'))  to s
-        Move (Replaces(Character(12),s,'\f')) to s
-        Move (Replaces(Character(10),s,'\n')) to s
-        Move (Replaces(Character(13),s,'\r')) to s
-        Move (Replaces(Character(9),s,'\t'))  to s
+        Move (Replaces('"',s,'\"'))           to s  
+        For i from 1 to 31
+            If (i <= 15) Begin
+                Move (Replaces(Character(i), s, SFormat("\u000%1", _IntToHex(Self, i)))) to s
+            End
+            Else Begin
+                Move (Replaces(Character(i), s, SFormat("\u00%1", _IntToHex(Self, i)))) to s
+            End
+        Loop
     End_Procedure
     
     Function _ArrayCast Variant v Returns Variant[]
