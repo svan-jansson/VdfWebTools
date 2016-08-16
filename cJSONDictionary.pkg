@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.15:
+// cJSONDictionary class v1.16:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -70,7 +70,7 @@ Class cJSONDictionary is a cHashTable
     End_Function
     
     Function _ValueKey String sKey Returns String
-        Function_Return (SFormat("__[internal]__[t]*%1", sKey))
+        Function_Return ("__[internal]__[t]*" + sKey)
     End_Function
     
     Function _IsValueKey String sKey Returns Boolean
@@ -103,10 +103,10 @@ Class cJSONDictionary is a cHashTable
         Move (Replaces('"',s,'\"'))           to s  
         For i from 1 to 31
             If (i <= 15) Begin
-                Move (Replaces(Character(i), s, SFormat("\u000%1", _IntToHex(Self, i)))) to s
+                Move (Replaces(Character(i), s, ("\u000" + _IntToHex(Self, i)))) to s
             End
             Else Begin
-                Move (Replaces(Character(i), s, SFormat("\u00%1", _IntToHex(Self, i)))) to s
+                Move (Replaces(Character(i), s, ("\u00" + _IntToHex(Self, i)))) to s
             End
         Loop
     End_Procedure
@@ -215,7 +215,7 @@ Class cJSONDictionary is a cHashTable
                 Case (type = _jsond_string or type = _jsond_unspecified) 
                     Move v to sValue
                     Send _Escape (&sValue)
-                    Move (SFormat('"%1"', sValue)) to sValue
+                    Move ('"' + sValue + '"') to sValue
                 Case Break
 
                 Case (type = _jsond_number) 
@@ -236,24 +236,24 @@ Class cJSONDictionary is a cHashTable
                     For ii from 0 to iLastElement
                         Get _Type "" va[ii] to child_type
                         If (child_type = _jsond_null) Begin
-                            Append sValue (SFormat('null%1', If(ii < iLastElement,',','')))
+                            Append sValue ("null" + If(ii < iLastElement,',',''))
                         End         
                         Else If (child_type = _jsond_bool) Begin
                             Move va[ii] to b
-                            Append sValue (SFormat('%2%1', If(ii < iLastElement,',',''), (If(b, "true", "false"))))
+                            Append sValue (If(ii < iLastElement,',','') + If(b, "true", "false"))
                         End
                         Else If (child_type = _jsond_string or child_type = _jsond_unspecified) Begin
                             Move va[ii] to sChildValue
                             Send _Escape (&sChildValue)
-                            Append sValue (SFormat('"%1"%2', sChildValue, If(ii < iLastElement,',','')))
+                            Append sValue ('"' + sChildValue + '"' + If(ii < iLastElement,',',''))
                         End
                         Else If (child_type = _jsond_number) Begin
                             Move va[ii] to sChildValue
-                            Append sValue (SFormat('%1%2', _JSONNumber(Self, sChildValue), If(ii < iLastElement,',','')))
+                            Append sValue (_JSONNumber(Self, sChildValue) + If(ii < iLastElement,',',''))
                         End
                         Else If (child_type = _jsond_object) Begin
                             Get Serialize of va[ii] to sChildValue
-                            Append sValue (SFormat('%1%2', sChildValue, If(ii < iLastElement,',','')))
+                            Append sValue (sChildValue + If(ii < iLastElement,',',''))
                         End
                     Loop
                     
@@ -269,7 +269,7 @@ Class cJSONDictionary is a cHashTable
                     For ii from 0 to iLastElement
                         If (va[ii] <= 0) Move "{}" to sChildValue
                         else Get Serialize of va[ii] to sChildValue
-                        Append sValue (SFormat('%1%2', sChildValue, If(ii < iLastElement,',','')))
+                        Append sValue (sChildValue + If(ii < iLastElement,',',''))
                     Loop
                     Append sValue "]"
                     
@@ -277,7 +277,7 @@ Class cJSONDictionary is a cHashTable
                 
             Case End
             
-            Append sJSON (SFormat('"%1":%2%3', sKey, sValue, If(i < iLastKey,',',''))) 
+            Append sJSON ('"' + sKey + '":' + sValue + If(i < iLastKey,',',''))
             
         Loop
         
@@ -299,7 +299,7 @@ Class cJSONDictionary is a cHashTable
             Move (DateSetDay(dt1970, 1)) to dt1970
             Move (dt - dt1970) to ts
             Move (SpanTotalMilliseconds(ts)) to ms
-            Set Value sKey to (SFormat("/Date(%1)/", ms)) 
+            Set Value sKey to ("/Date(" + String(ms) + ")/")
         End
     End_Procedure
 

@@ -1,4 +1,4 @@
-// cWebClient class v1.06:
+// cWebClient class v1.07:
 // Created by Erik Svensson and published on eriksven.com in May 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cWEBCLIENT_INCLUDED for 1
@@ -178,11 +178,7 @@ Class cWebClient is a cObject
         Send _ClearDataReceived of (phTransfer(Self))
         Get _URISegments sURL to Uri
         Send _PrepareRequest Uri hTransfer
-        Get HTTPGetRequest of hTransfer (SFormat("%1%2%3%4", ;
-                                                 Uri.Path, ;
-                                                 Uri.Name, ;
-                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
-                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) to iStatus
+        Get HTTPGetRequest of hTransfer (Uri.Path + Uri.Name + If(Uri.Query <> "", "?" + Uri.Query, "") + If(Uri.Hash <> "", "#" + Uri.Hash, "")) to iStatus
         
         Function_Return (iStatus <> 0)
     End_Function
@@ -205,11 +201,7 @@ Class cWebClient is a cObject
                 Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded"
             End
         End
-        Get HttpPostRequest of hTransfer (SFormat("%1%2%3%4", ;
-                                                 Uri.Path, ;
-                                                 Uri.Name, ;
-                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
-                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) sData bIsFile to iStatus
+        Get HttpPostRequest of hTransfer (Uri.Path + Uri.Name + If(Uri.Query <> "", "?" + Uri.Query, "") + If(Uri.Hash <> "", "#" + Uri.Hash, "")) sData bIsFile to iStatus
         Function_Return (iStatus <> 0)
     End_Function
 
@@ -231,11 +223,7 @@ Class cWebClient is a cObject
                 Set RequestHeader "Content-Type" to "application/x-www-form-urlencoded"
             End
         End
-        Get HttpPutRequest of hTransfer (SFormat("%1%2%3%4", ;
-                                                 Uri.Path, ;
-                                                 Uri.Name, ;
-                                                 (If(Uri.Query <> "", "?" + Uri.Query, "")), ;
-                                                 (If(Uri.Hash <> "", "#" + Uri.Hash, "")))) sData bIsFile to iStatus
+        Get HttpPutRequest of hTransfer (Uri.Path + Uri.Name + If(Uri.Query <> "", "?" + Uri.Query, "") + If(Uri.Hash <> "", "#" + Uri.Hash, "")) sData bIsFile to iStatus
         Function_Return (iStatus <> 0)
     End_Function
 
