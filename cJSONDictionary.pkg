@@ -1,4 +1,4 @@
-// cJSONDictionary class v1.16:
+// cJSONDictionary class v1.17:
 // Created by Erik Svensson and published on eriksven.com in April 2013
 // License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
 Define cJSONDICTIONARY_INCLUDED for 1
@@ -311,6 +311,78 @@ Class cJSONDictionary is a cHashTable
         Get _ValueKey sKey to sValueKey
         Set Value sValueKey to type
     End_Procedure
+    
+    { Visibility=Public }
+    Procedure Set StringValue String sKey String sValue
+        Set TypedValue sKey _jsond_string to sValue
+    End_Procedure
+    
+    { Visibility=Public }
+    Function StringValue String sKey Returns String
+        String sRetVal
+        Get Value sKey to sRetVal
+        Function_Return sRetVal
+    End_Function
+    
+    { Visibility=Public }
+    Procedure Set NumericValue String sKey Number nValue
+        Set TypedValue sKey _jsond_number to nValue
+    End_Procedure
+    
+    { Visibility=Public }
+    Function NumericValue String sKey Returns Number
+        Number nRetVal
+        Get Value sKey to nRetVal
+        Function_Return nRetVal
+    End_Function
+    
+    { Visibility=Public }
+    Procedure Set BooleanValue String sKey Boolean bValue
+        Set TypedValue sKey _jsond_bool to bValue
+    End_Procedure
+    
+    { Visibility=Public }
+    Function BooleanValue String sKey Returns Boolean
+        Boolean bRetVal
+        Get Value sKey to bRetVal
+        Function_Return bRetVal
+    End_Function
+    
+    { Visibility=Public }
+    Procedure Set ArrayValue String sKey Variant vArray
+        Set TypedValue sKey _jsond_array to vArray
+    End_Procedure
+    
+    { Visibility=Public }
+    Function ArrayValue String sKey Returns Variant
+        Variant vRetVal
+        Get Value sKey to vRetVal
+        Function_Return vRetVal
+    End_Function
+    
+    { Visibility=Public }
+    Procedure Set ObjectValue String sKey Handle hJsonDictionary
+        Set TypedValue sKey _jsond_object to hJsonDictionary
+    End_Procedure
+    
+    { Visibility=Public }
+    Function ObjectValue String sKey Returns Handle
+        Handle hRetVal
+        Get Value sKey to hRetVal
+        Function_Return hRetVal
+    End_Function
+    
+    { Visibility=Public }
+    Procedure Set ObjectArrayValue String sKey Handle[] haJsonDictionaries
+        Set TypedValue sKey _jsond_object_array to haJsonDictionaries
+    End_Procedure
+    
+    { Visibility=Public }
+    Function ObjectArrayValue String sKey Returns Handle[]
+        Handle[] haRetVal
+        Get Value sKey to haRetVal
+        Function_Return haRetVal
+    End_Function
     
     { Visibility=Public }
     Function TypeForValue String sKey Returns _jsond_type
