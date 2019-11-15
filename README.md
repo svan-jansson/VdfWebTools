@@ -4,10 +4,17 @@ This is a set of helper classes for working with web requests and web content in
 
 ## JSON Examples
 
+### Table of Contents
+1. [Context](#context)
+2. [Parsing an Object](#parsing-object)
+3. [Parsing an Array](#parsing-array)
+3. [Creating and Serializing a JSON Object](#serializing-object)
+
+### Context <a name="context"></a>
 * The `cJSONParser` class helps you parse JSON strings using the `Parse` procedure.
 * The `cJSONDictionary` class helps you access, mutate and serialize JSON objects. It depends on [cHashTable](https://github.com/svan-jansson/cHashTable) and [cRegex](https://github.com/svan-jansson/cRegex).
 
-### Parsing an Object
+### Parsing an Object <a name="parsing-object"></a>
 ```dataflex
 
 Procedure ParsingExample
@@ -29,7 +36,7 @@ End_Procedure
 
 ```
 
-### Parsing an Array
+### Parsing an Array <a name="parsing-array"></a>
 
 ```dataflex
 Procedure ParsingExample
@@ -53,7 +60,7 @@ Procedure ParsingExample
 End_Procedure
 ```
 
-### Creating and Serializing a JSON Object
+### Creating and Serializing a JSON Object <a name="serializing-object"></a>
 
 Let's recreate this JSON string using DataFlex:
 
