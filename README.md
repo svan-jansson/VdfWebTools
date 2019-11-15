@@ -81,18 +81,18 @@ Let's recreate this JSON string using DataFlex:
 ```dataflex
 Procedure SerializingExample
   Handle hAnimal hProperties
-  String[] saRelatedAnimals
+  String[] vaRelatedAnimals
   String sJSON
   
-  Move "Zebra" to saRelatedAnimals[0]
-  Move "Mule" to saRelatedAnimals[1]
+  Move "Zebra" to vaRelatedAnimals[0]
+  Move "Mule" to vaRelatedAnimals[1]
   
   Get Create U_cJSONDictionary to hAnimal
   Get Create U_cJSONDictionary to hProperties
   
   Set TypedValue of hAnimal "type" _jsond_string to "Horse"
   Set TypedValue of hAnimal "properties" _jsond_object to hProperties
-  Set TypedValue of hAnimal "relatedAnimals" _jsond_array to saRelatedAnimals
+  Set TypedValue of hAnimal "relatedAnimals" _jsond_array to vaRelatedAnimals
   
   Set TypedValue of hProperties "legs" _jsond_number to 4
   Set TypedValue of hProperties "hasStripes" _jsond_bool to false
