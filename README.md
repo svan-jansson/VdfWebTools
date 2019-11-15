@@ -5,7 +5,7 @@ This is a set of helper classes for working with web requests and web content in
 ## JSON Examples
 
 * The `cJSONParser` class helps you parse JSON strings using the `Parse` procedure.
-* The `cJSONDictionary` class helps you access, mutate and serialize JSON objects ans is derived from [cHashTable](https://github.com/svan-jansson/cHashTable).
+* The `cJSONDictionary` class helps you access, mutate and serialize JSON objects. It depends on [cHashTable](https://github.com/svan-jansson/cHashTable) and [cRegex](https://github.com/svan-jansson/cRegex).
 
 ### Parsing an Object
 ```dataflex
