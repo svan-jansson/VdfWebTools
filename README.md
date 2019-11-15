@@ -81,7 +81,7 @@ Let's recreate this JSON string using DataFlex:
 ```dataflex
 Procedure SerializingExample
   Handle hAnimal hProperties
-  String[] vaRelatedAnimals
+  Variant[] vaRelatedAnimals
   String sJSON
   
   Move "Zebra" to vaRelatedAnimals[0]
