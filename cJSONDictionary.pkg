@@ -1,6 +1,6 @@
 // cJSONDictionary class v1.17:
 // Created by Erik Svensson and published on eriksven.com in April 2013
-// License: LGPLv3 - GNU LESSER GENERAL PUBLIC LICENSE Version 3 - http://www.gnu.org/licenses/lgpl.txt
+// License: MIT
 Define cJSONDICTIONARY_INCLUDED for 1
 
 #IFNDEF cHASHTABLE_INCLUDED
