@@ -535,7 +535,7 @@ Class cJSONParser is a cObject
 
     Procedure _ToCharArray String ByRef s UChar[] ByRef ca
         Address aStr
-        Move (ResizeArray(ca,Length(s))) to ca
+        Move (ResizeArray(ca, Length(s) + 1)) to ca
         Move (AddressOf(ca)) to aStr
         Move s to aStr
     End_Procedure

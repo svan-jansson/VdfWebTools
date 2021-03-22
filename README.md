@@ -2,6 +2,8 @@
 
 This is a set of helper classes for working with web requests and web content in DataFlex.
 
+Supported and tested on DataFlex 14.1-19.1, it most likely also work on earlier versions.
+
 ## JSON Examples
 
 ### Table of Contents
